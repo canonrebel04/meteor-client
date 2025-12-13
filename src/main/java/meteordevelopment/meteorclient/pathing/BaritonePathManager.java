@@ -8,16 +8,20 @@ package meteordevelopment.meteorclient.pathing;
 import baritone.api.BaritoneAPI;
 import baritone.api.pathing.goals.Goal;
 import baritone.api.pathing.goals.GoalGetToBlock;
+import baritone.api.pathing.goals.GoalNear;
 import baritone.api.pathing.goals.GoalXZ;
 import baritone.api.process.IBaritoneProcess;
 import baritone.api.process.PathingCommand;
 import baritone.api.process.PathingCommandType;
+import baritone.api.utils.input.Input;
 import baritone.api.utils.SettingsUtil;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.orbit.EventPriority;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
@@ -34,6 +38,12 @@ public class BaritonePathManager implements IPathManager {
     private boolean pathingPaused;
 
     private boolean safeMode;
+    private SafeModeSnapshot safeModeSnapshot;
+
+    private final RecoveryController recoveryController;
+    private int recoverCooldownTicks;
+
+    private final StuckTracker stuckTracker;
     private final BaritoneTaskAgent agent;
 
     public BaritonePathManager() {
@@ -43,6 +53,8 @@ public class BaritonePathManager implements IPathManager {
         // Create settings
         settings = new BaritoneSettings();
 
+        recoveryController = new RecoveryController();
+        stuckTracker = new StuckTracker();
         agent = new BaritoneTaskAgent(this);
 
         // Baritone pathing control
@@ -58,19 +70,46 @@ public class BaritonePathManager implements IPathManager {
     }
 
     public void setSafeMode(boolean enabled) {
+        if (safeMode == enabled) return;
+
         safeMode = enabled;
 
         if (enabled) {
+            safeModeSnapshot = SafeModeSnapshot.capture();
+
+            // "Assume" settings exposed in Meteor UI wrappers.
             settings.getWalkOnLava().set(false);
             settings.getWalkOnWater().set(false);
             settings.getStep().set(false);
-            settings.getNoFall().set(true);
-        }
-        else {
-            settings.getWalkOnLava().reset();
-            settings.getWalkOnWater().reset();
-            settings.getStep().reset();
-            settings.getNoFall().reset();
+
+            // This wrapper is inverted in practice (it raises maxFallHeightNoWater);
+            // safe mode should be conservative.
+            settings.getNoFall().set(false);
+
+            // Additional conservative movement settings (best-effort; ignore if missing).
+            setBaritoneSettingBoolean("allowParkour", false);
+            setBaritoneSettingBoolean("allowParkourAscend", false);
+            setBaritoneSettingBoolean("allowParkourPlace", false);
+            setBaritoneSettingBoolean("allowSprint", false);
+            setBaritoneSettingBoolean("allowWaterBucketFall", false);
+        } else {
+            // Restore explicit values first (if we captured them).
+            if (safeModeSnapshot != null) {
+                safeModeSnapshot.restore();
+                safeModeSnapshot = null;
+            } else {
+                // Fallback: reset the settings we know about.
+                settings.getWalkOnLava().reset();
+                settings.getWalkOnWater().reset();
+                settings.getStep().reset();
+                settings.getNoFall().reset();
+
+                setBaritoneSettingBoolean("allowParkour", BaritoneAPI.getSettings().allowParkour.defaultValue);
+                setBaritoneSettingBoolean("allowParkourAscend", BaritoneAPI.getSettings().allowParkourAscend.defaultValue);
+                setBaritoneSettingBoolean("allowParkourPlace", BaritoneAPI.getSettings().allowParkourPlace.defaultValue);
+                setBaritoneSettingBoolean("allowSprint", BaritoneAPI.getSettings().allowSprint.defaultValue);
+                setBaritoneSettingBoolean("allowWaterBucketFall", BaritoneAPI.getSettings().allowWaterBucketFall.defaultValue);
+            }
         }
     }
 
@@ -104,20 +143,41 @@ public class BaritonePathManager implements IPathManager {
     }
 
     public void smartMoveTo(BlockPos pos) {
+        smartMoveTo(pos, false);
+    }
+
+    public void smartMoveTo(BlockPos pos, boolean ignoreYHint) {
+        var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
+
         BlockPos self = mc.player != null ? mc.player.getBlockPos() : null;
-        boolean ignoreY = self != null && Math.abs(self.getY() - pos.getY()) <= 3;
-        moveTo(pos, ignoreY);
+        boolean ignoreY = ignoreYHint || (self != null && Math.abs(self.getY() - pos.getY()) <= 3);
+
+        // If the target looks risky (fluid / void), stop near it instead of forcing exact arrival.
+        boolean hazardousTarget = isHazardousTarget(pos);
+        int approachRadius = (safeMode || hazardousTarget) ? 2 : 0;
+
+        if (ignoreY) {
+            baritone.getCustomGoalProcess().setGoalAndPath(new GoalXZ(pos.getX(), pos.getZ()));
+            return;
+        }
+
+        if (approachRadius > 0) {
+            baritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(pos, approachRadius));
+            return;
+        }
+
+        baritone.getCustomGoalProcess().setGoalAndPath(new GoalGetToBlock(pos));
     }
 
     public void recover() {
+        if (recoverCooldownTicks > 0) return;
+
         var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
-
         Goal goal = baritone.getCustomGoalProcess().getGoal();
-        stop();
+        if (goal == null) return;
 
-        if (goal != null) {
-            baritone.getCustomGoalProcess().setGoalAndPath(goal);
-        }
+        recoverCooldownTicks = 40;
+        recoveryController.start(goal);
     }
 
     @Override
@@ -164,6 +224,10 @@ public class BaritonePathManager implements IPathManager {
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onTick(TickEvent.Pre event) {
         agent.tick();
+
+        if (recoverCooldownTicks > 0) recoverCooldownTicks--;
+        stuckTracker.tick();
+        recoveryController.tick();
 
         if (directionGoal == null) return;
 
@@ -273,6 +337,205 @@ public class BaritonePathManager implements IPathManager {
         @Override
         public String displayName0() {
             return "Meteor Client";
+        }
+    }
+
+    private boolean isHazardousTarget(BlockPos pos) {
+        if (mc.world == null) return false;
+
+        BlockState state = mc.world.getBlockState(pos);
+        if (!state.getFluidState().isEmpty() && state.getFluidState().isIn(FluidTags.LAVA)) return true;
+
+        // If the target is air and the block below is air, treat it as a "void/fall" risk.
+        if (state.isAir()) {
+            BlockState below = mc.world.getBlockState(pos.down());
+            return below.isAir();
+        }
+
+        return false;
+    }
+
+    private static void setBaritoneSettingBoolean(String name, boolean value) {
+        try {
+            var settings = BaritoneAPI.getSettings();
+            var field = settings.getClass().getDeclaredField(name);
+            Object obj = field.get(settings);
+            if (obj instanceof baritone.api.Settings.Setting<?> setting && setting.value instanceof Boolean) {
+                @SuppressWarnings("unchecked")
+                baritone.api.Settings.Setting<Boolean> booleanSetting = (baritone.api.Settings.Setting<Boolean>) setting;
+                booleanSetting.value = value;
+            }
+        } catch (Throwable ignored) {
+            // Best effort only; Baritone settings differ across versions.
+        }
+    }
+
+    private static final class SafeModeSnapshot {
+        private final Boolean allowParkour;
+        private final Boolean allowParkourAscend;
+        private final Boolean allowParkourPlace;
+        private final Boolean allowSprint;
+        private final Boolean allowWaterBucketFall;
+
+        private SafeModeSnapshot(Boolean allowParkour, Boolean allowParkourAscend, Boolean allowParkourPlace, Boolean allowSprint, Boolean allowWaterBucketFall) {
+            this.allowParkour = allowParkour;
+            this.allowParkourAscend = allowParkourAscend;
+            this.allowParkourPlace = allowParkourPlace;
+            this.allowSprint = allowSprint;
+            this.allowWaterBucketFall = allowWaterBucketFall;
+        }
+
+        static SafeModeSnapshot capture() {
+            return new SafeModeSnapshot(
+                getBaritoneSettingBoolean("allowParkour"),
+                getBaritoneSettingBoolean("allowParkourAscend"),
+                getBaritoneSettingBoolean("allowParkourPlace"),
+                getBaritoneSettingBoolean("allowSprint"),
+                getBaritoneSettingBoolean("allowWaterBucketFall")
+            );
+        }
+
+        void restore() {
+            if (allowParkour != null) setBaritoneSettingBoolean("allowParkour", allowParkour);
+            if (allowParkourAscend != null) setBaritoneSettingBoolean("allowParkourAscend", allowParkourAscend);
+            if (allowParkourPlace != null) setBaritoneSettingBoolean("allowParkourPlace", allowParkourPlace);
+            if (allowSprint != null) setBaritoneSettingBoolean("allowSprint", allowSprint);
+            if (allowWaterBucketFall != null) setBaritoneSettingBoolean("allowWaterBucketFall", allowWaterBucketFall);
+        }
+
+        private static Boolean getBaritoneSettingBoolean(String name) {
+            try {
+                var settings = BaritoneAPI.getSettings();
+                var field = settings.getClass().getDeclaredField(name);
+                Object obj = field.get(settings);
+                if (obj instanceof baritone.api.Settings.Setting setting && setting.value instanceof Boolean b) {
+                    return b;
+                }
+            } catch (Throwable ignored) {
+            }
+            return null;
+        }
+    }
+
+    private final class RecoveryController {
+        private Goal goal;
+        private int phase;
+        private int phaseTicks;
+        private int yawFlip;
+
+        void start(Goal goal) {
+            this.goal = goal;
+            this.phase = 0;
+            this.phaseTicks = 0;
+        }
+
+        void tick() {
+            if (goal == null) return;
+            if (mc.player == null) {
+                cancel();
+                return;
+            }
+
+            var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
+
+            // If something else replaced the goal, abort recovery.
+            if (goal != baritone.getCustomGoalProcess().getGoal() && baritone.getCustomGoalProcess().getGoal() != null) {
+                cancel();
+                return;
+            }
+
+            // Phase 0: cancel + clear inputs
+            if (phase == 0) {
+                baritone.getPathingBehavior().cancelEverything();
+                baritone.getInputOverrideHandler().clearAllKeys();
+                phase = 1;
+                phaseTicks = 0;
+
+                // Rotate a bit to break repeated collision patterns.
+                float yaw = mc.player.getYaw() + ((yawFlip++ % 2 == 0) ? 90f : -90f);
+                mc.player.setYaw(yaw);
+                return;
+            }
+
+            // Phase 1: backstep a few ticks
+            if (phase == 1) {
+                baritone.getInputOverrideHandler().clearAllKeys();
+                baritone.getInputOverrideHandler().setInputForceState(Input.MOVE_BACK, true);
+                phaseTicks++;
+                if (phaseTicks >= 6) {
+                    phase = 2;
+                    phaseTicks = 0;
+                }
+                return;
+            }
+
+            // Phase 2: jump while backing up
+            if (phase == 2) {
+                baritone.getInputOverrideHandler().clearAllKeys();
+                baritone.getInputOverrideHandler().setInputForceState(Input.MOVE_BACK, true);
+                baritone.getInputOverrideHandler().setInputForceState(Input.JUMP, true);
+                phaseTicks++;
+                if (phaseTicks >= 2) {
+                    phase = 3;
+                    phaseTicks = 0;
+                }
+                return;
+            }
+
+            // Phase 3: clear inputs, re-path
+            if (phase == 3) {
+                baritone.getInputOverrideHandler().clearAllKeys();
+                phaseTicks++;
+                if (phaseTicks >= 2) {
+                    baritone.getCustomGoalProcess().setGoalAndPath(goal);
+                    cancel();
+                }
+            }
+        }
+
+        private void cancel() {
+            this.goal = null;
+            this.phase = 0;
+            this.phaseTicks = 0;
+        }
+    }
+
+    private final class StuckTracker {
+        private Vec3d lastPos;
+        private int stuckTicks;
+
+        void tick() {
+            if (mc.player == null) {
+                lastPos = null;
+                stuckTicks = 0;
+                return;
+            }
+
+            boolean pathing = isPathing();
+            if (!pathing) {
+                lastPos = null;
+                stuckTicks = 0;
+                return;
+            }
+
+            Vec3d now = mc.player.getEntityPos();
+            if (lastPos == null) {
+                lastPos = now;
+                stuckTicks = 0;
+                return;
+            }
+
+            double movedSq = now.squaredDistanceTo(lastPos);
+            // If we haven't moved meaningfully for a while while pathing, count as stuck.
+            if (movedSq < 0.05 * 0.05) stuckTicks++;
+            else stuckTicks = 0;
+
+            lastPos = now;
+        }
+
+        @SuppressWarnings("unused")
+        boolean isStuck() {
+            return stuckTicks >= 60;
         }
     }
 }

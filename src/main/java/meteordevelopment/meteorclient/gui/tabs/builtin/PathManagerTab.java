@@ -81,7 +81,7 @@ public class PathManagerTab extends Tab {
 
                 actions.add(theme.button("Smart Goto…")).widget().action = () -> {
                     BlockPos initial = mc.player != null ? mc.player.getBlockPos() : BlockPos.ORIGIN;
-                    new BlockPosPrompt(theme, this, initial, (pos, ignoreY) -> baritone.smartMoveTo(pos))
+                    new BlockPosPrompt(theme, this, initial, baritone::smartMoveTo)
                         .title("Smart Goto")
                         .dontShowAgainCheckboxVisible(false)
                         .show();
