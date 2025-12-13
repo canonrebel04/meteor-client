@@ -280,6 +280,8 @@ public class AutoTrap extends Module {
                     add(targetPos.add(0, 1, -1));
                 }
                 case Top -> add(targetPos.add(0, 2, 0));
+                case None -> {
+                }
             }
 
             switch (bottomPlacement.get()) {
@@ -298,6 +300,8 @@ public class AutoTrap extends Module {
                     add(targetPos.add(0, 0, 1));
                 }
                 case Single -> add(targetPos.add(0, -1, 0));
+                case None -> {
+                }
             }
         }
 

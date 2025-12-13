@@ -33,6 +33,9 @@ public class BaritonePathManager implements IPathManager {
     private GoalDirection directionGoal;
     private boolean pathingPaused;
 
+    private boolean safeMode;
+    private final BaritoneTaskAgent agent;
+
     public BaritonePathManager() {
         // Subscribe to event bus
         MeteorClient.EVENT_BUS.subscribe(this);
@@ -40,8 +43,39 @@ public class BaritonePathManager implements IPathManager {
         // Create settings
         settings = new BaritoneSettings();
 
+        agent = new BaritoneTaskAgent(this);
+
         // Baritone pathing control
         BaritoneAPI.getProvider().getPrimaryBaritone().getPathingControlManager().registerProcess(new BaritoneProcess());
+    }
+
+    public boolean isPaused() {
+        return pathingPaused;
+    }
+
+    public boolean isSafeMode() {
+        return safeMode;
+    }
+
+    public void setSafeMode(boolean enabled) {
+        safeMode = enabled;
+
+        if (enabled) {
+            settings.getWalkOnLava().set(false);
+            settings.getWalkOnWater().set(false);
+            settings.getStep().set(false);
+            settings.getNoFall().set(true);
+        }
+        else {
+            settings.getWalkOnLava().reset();
+            settings.getWalkOnWater().reset();
+            settings.getStep().reset();
+            settings.getNoFall().reset();
+        }
+    }
+
+    public BaritoneTaskAgent getAgent() {
+        return agent;
     }
 
     @Override
@@ -67,6 +101,23 @@ public class BaritonePathManager implements IPathManager {
     @Override
     public void stop() {
         BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
+    }
+
+    public void smartMoveTo(BlockPos pos) {
+        BlockPos self = mc.player != null ? mc.player.getBlockPos() : null;
+        boolean ignoreY = self != null && Math.abs(self.getY() - pos.getY()) <= 3;
+        moveTo(pos, ignoreY);
+    }
+
+    public void recover() {
+        var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
+
+        Goal goal = baritone.getCustomGoalProcess().getGoal();
+        stop();
+
+        if (goal != null) {
+            baritone.getCustomGoalProcess().setGoalAndPath(goal);
+        }
     }
 
     @Override
@@ -112,6 +163,8 @@ public class BaritonePathManager implements IPathManager {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onTick(TickEvent.Pre event) {
+        agent.tick();
+
         if (directionGoal == null) return;
 
         if (directionGoal != BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().getGoal()) {
@@ -122,6 +175,7 @@ public class BaritonePathManager implements IPathManager {
         directionGoal.tick();
     }
 
+    @SuppressWarnings("unused")
     private static class GoalDirection implements Goal {
         private static final double SQRT_2 = Math.sqrt(2);
 
