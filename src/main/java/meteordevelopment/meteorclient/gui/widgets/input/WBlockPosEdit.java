@@ -6,6 +6,7 @@
 package meteordevelopment.meteorclient.gui.widgets.input;
 
 import meteordevelopment.meteorclient.MeteorClient;
+import meteordevelopment.meteorclient.events.meteor.MouseClickEvent;
 import meteordevelopment.meteorclient.events.entity.player.InteractBlockEvent;
 import meteordevelopment.meteorclient.events.entity.player.StartBreakingBlockEvent;
 import meteordevelopment.meteorclient.gui.widgets.containers.WHorizontalList;
@@ -15,6 +16,7 @@ import meteordevelopment.meteorclient.systems.modules.render.marker.Marker;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 
@@ -33,8 +35,24 @@ public class WBlockPosEdit extends WHorizontalList {
 
     private boolean clicking;
 
+    private static final double PICK_RAY_DISTANCE = 256.0;
+
+    private static final int MOUSE_LEFT = 0;
+    private static final int MOUSE_RIGHT = 1;
+
+    private final boolean showClickButton;
+    private final boolean showSetHereButton;
+
     public WBlockPosEdit(BlockPos value) {
         this.value = value;
+        this.showClickButton = true;
+        this.showSetHereButton = true;
+    }
+
+    public WBlockPosEdit(BlockPos value, boolean showClickButton, boolean showSetHereButton) {
+        this.value = value;
+        this.showClickButton = showClickButton;
+        this.showSetHereButton = showSetHereButton;
     }
 
     @Override
@@ -42,26 +60,30 @@ public class WBlockPosEdit extends WHorizontalList {
         addTextBox();
 
         if (Utils.canUpdate()) {
-            WButton click = add(theme.button("Click")).expandX().widget();
-            click.action = () -> {
-                String sb = "Click!\nRight click to pick a new position.\nLeft click to cancel.";
-                Modules.get().get(Marker.class).info(sb);
+            if (showClickButton) {
+                WButton click = add(theme.button("Pick")).expandX().widget();
+                click.action = () -> {
+                    String sb = "Pick mode!\nLook at a block and right click to pick it (up to 256 blocks).\nLeft click to cancel.";
+                    Modules.get().get(Marker.class).info(sb);
 
-                clicking = true;
-                MeteorClient.EVENT_BUS.subscribe(this);
-                previousScreen = mc.currentScreen;
-                mc.setScreen(null);
-            };
+                    clicking = true;
+                    MeteorClient.EVENT_BUS.subscribe(this);
+                    previousScreen = mc.currentScreen;
+                    mc.setScreen(null);
+                };
+            }
 
-            WButton here = add(theme.button("Set Here")).expandX().widget();
-            here.action = () -> {
-                lastValue = value;
-                set(new BlockPos(mc.player.getBlockPos()));
-                newValueCheck();
+            if (showSetHereButton) {
+                WButton here = add(theme.button("Set Here")).expandX().widget();
+                here.action = () -> {
+                    lastValue = value;
+                    set(new BlockPos(mc.player.getBlockPos()));
+                    newValueCheck();
 
-                clear();
-                init();
-            };
+                    clear();
+                    init();
+                };
+            }
         }
     }
 
@@ -70,6 +92,42 @@ public class WBlockPosEdit extends WHorizontalList {
         if (clicking) {
             clicking = false;
             event.cancel();
+            MeteorClient.EVENT_BUS.unsubscribe(this);
+            mc.setScreen(previousScreen);
+        }
+    }
+
+    @EventHandler
+    private void onMouseClick(MouseClickEvent event) {
+        if (!clicking) return;
+        if (event.action != meteordevelopment.meteorclient.utils.misc.input.KeyAction.Press) return;
+
+        // Always consume clicks while picking.
+        event.setCancelled(true);
+
+        // Left click cancels pick mode.
+        if (event.button() == MOUSE_LEFT) {
+            clicking = false;
+            MeteorClient.EVENT_BUS.unsubscribe(this);
+            mc.setScreen(previousScreen);
+            return;
+        }
+
+        // Right click selects a position by long raycast.
+        if (event.button() == MOUSE_RIGHT) {
+            if (mc.player == null) return;
+
+            HitResult hit = mc.player.raycast(PICK_RAY_DISTANCE, 0f, false);
+            if (hit.getType() != HitResult.Type.BLOCK) return;
+
+            lastValue = value;
+            set(((BlockHitResult) hit).getBlockPos());
+            newValueCheck();
+
+            clear();
+            init();
+
+            clicking = false;
             MeteorClient.EVENT_BUS.unsubscribe(this);
             mc.setScreen(previousScreen);
         }

@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.fabric.loom)
     id("maven-publish")
@@ -98,6 +100,12 @@ dependencies {
     jij(libs.netty.handler.proxy) { isTransitive = false }
     jij(libs.netty.codec.socks) { isTransitive = false }
     jij(libs.waybackauthlib)
+
+    // Fix "unknown enum constant Level.FULL" warnings (missing j2objc annotations at compile time).
+    compileOnly("com.google.j2objc:j2objc-annotations:2.8")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
 // Handle transitive dependencies for jar-in-jar
@@ -190,6 +198,48 @@ tasks {
         options.release = 21
         options.compilerArgs.add("-Xlint:deprecation")
         options.compilerArgs.add("-Xlint:unchecked")
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+
+    val prismMinecraftDir = providers.gradleProperty("prismMinecraftDir")
+        .orElse(providers.environmentVariable("PRISM_MINECRAFT_DIR"))
+        .orElse("${System.getProperty("user.home")}/.local/share/PrismLauncher/instances/1.21.10/minecraft")
+
+    register<Copy>("deployToPrism") {
+        group = "deployment"
+        description = "Builds the remapped jar and copies it into PrismLauncher instance mods/ (overwrites)."
+
+        val remapJarTask = named("remapJar")
+        dependsOn(remapJarTask)
+
+        val archivesBaseNameValue = project.base.archivesName.get()
+        val modsDirProvider = prismMinecraftDir.map { File(it, "mods") }
+
+        from(remapJarTask)
+        into(modsDirProvider)
+
+        doFirst {
+            val modsDir = modsDirProvider.get()
+            require(modsDir.isDirectory) {
+                "PrismLauncher mods dir not found: ${modsDir.absolutePath}. " +
+                    "Set -PprismMinecraftDir=/path/to/PrismLauncher/instances/<instance>/minecraft " +
+                    "or env PRISM_MINECRAFT_DIR."
+            }
+
+            val targetName = remapJarTask.get().outputs.files.singleFile.name
+
+            modsDir.listFiles()
+                ?.filter { it.isFile }
+                ?.filter {
+                    (it.name == "$archivesBaseNameValue.jar") ||
+                        (it.name.startsWith("$archivesBaseNameValue-") && it.name.endsWith(".jar"))
+                }
+                ?.filter { it.name != targetName }
+                ?.forEach { it.delete() }
+        }
     }
 
     javadoc {

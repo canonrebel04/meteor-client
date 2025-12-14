@@ -16,10 +16,12 @@ import meteordevelopment.meteorclient.commands.Command;
 import meteordevelopment.meteorclient.commands.arguments.ModuleArgumentType;
 import meteordevelopment.meteorclient.commands.arguments.PlayerArgumentType;
 import meteordevelopment.meteorclient.pathing.PathManagers;
+import meteordevelopment.meteorclient.pathing.BaritonePathManager;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmConnection;
+import meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmProtocol;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmWorker;
 import meteordevelopment.meteorclient.systems.modules.world.InfinityMiner;
 import meteordevelopment.meteorclient.utils.misc.text.MeteorClickEvent;
@@ -371,6 +373,143 @@ public class SwarmCommand extends Command {
             return SINGLE_SUCCESS;
         }));
 
+        builder.then(literal("baritone")
+            .then(literal("stop").executes(context -> {
+                Swarm swarm = Modules.get().get(Swarm.class);
+                if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                if (swarm.isHost()) swarm.host.sendMessage(SwarmProtocol.stop());
+                else if (swarm.isWorker()) {
+                    BaritonePathManager baritone = getBaritone();
+                    if (baritone != null) baritone.stop();
+                }
+                return SINGLE_SUCCESS;
+            }))
+            .then(literal("pause").executes(context -> {
+                Swarm swarm = Modules.get().get(Swarm.class);
+                if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                if (swarm.isHost()) swarm.host.sendMessage(SwarmProtocol.pause());
+                else if (swarm.isWorker()) {
+                    BaritonePathManager baritone = getBaritone();
+                    if (baritone != null) baritone.pause();
+                }
+                return SINGLE_SUCCESS;
+            }))
+            .then(literal("resume").executes(context -> {
+                Swarm swarm = Modules.get().get(Swarm.class);
+                if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                if (swarm.isHost()) swarm.host.sendMessage(SwarmProtocol.resume());
+                else if (swarm.isWorker()) {
+                    BaritonePathManager baritone = getBaritone();
+                    if (baritone != null) baritone.resume();
+                }
+                return SINGLE_SUCCESS;
+            }))
+            .then(literal("recover").executes(context -> {
+                Swarm swarm = Modules.get().get(Swarm.class);
+                if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                if (swarm.isHost()) swarm.host.sendMessage(SwarmProtocol.recover());
+                else if (swarm.isWorker()) {
+                    BaritonePathManager baritone = getBaritone();
+                    if (baritone != null) baritone.recover();
+                }
+                return SINGLE_SUCCESS;
+            }))
+            .then(literal("safe-mode")
+                .then(argument("enabled", BoolArgumentType.bool()).executes(context -> {
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                    if (swarm.isHost()) swarm.host.sendMessage(SwarmProtocol.safeMode(BoolArgumentType.getBool(context, "enabled")));
+                    else if (swarm.isWorker()) {
+                        BaritonePathManager baritone = getBaritone();
+                        if (baritone != null) baritone.setSafeMode(BoolArgumentType.getBool(context, "enabled"));
+                    }
+                    return SINGLE_SUCCESS;
+                }))
+            )
+            .then(literal("goto")
+                .then(argument("pos", meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.blockPos()).executes(context -> {
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                    if (swarm.isHost()) {
+                        var pos = meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos");
+                        swarm.host.sendMessage(SwarmProtocol.goTo(pos.getX(), pos.getY(), pos.getZ(), true));
+                    }
+                    else if (swarm.isWorker()) {
+                        BaritonePathManager baritone = getBaritone();
+                        if (baritone != null) baritone.moveTo(meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos"), true);
+                    }
+                    return SINGLE_SUCCESS;
+                })
+                .then(argument("ignore-y", BoolArgumentType.bool()).executes(context -> {
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                    if (swarm.isHost()) {
+                        var pos = meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos");
+                        swarm.host.sendMessage(SwarmProtocol.goTo(pos.getX(), pos.getY(), pos.getZ(), BoolArgumentType.getBool(context, "ignore-y")));
+                    }
+                    else if (swarm.isWorker()) {
+                        BaritonePathManager baritone = getBaritone();
+                        if (baritone != null) baritone.moveTo(meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos"), BoolArgumentType.getBool(context, "ignore-y"));
+                    }
+                    return SINGLE_SUCCESS;
+                }))))
+            .then(literal("smart-goto")
+                .then(argument("pos", meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.blockPos()).executes(context -> {
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                    if (swarm.isHost()) {
+                        var pos = meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos");
+                        swarm.host.sendMessage(SwarmProtocol.smartGoTo(pos.getX(), pos.getY(), pos.getZ(), false));
+                    }
+                    else if (swarm.isWorker()) {
+                        BaritonePathManager baritone = getBaritone();
+                        if (baritone != null) baritone.smartMoveTo(meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos"), false);
+                    }
+                    return SINGLE_SUCCESS;
+                })
+                .then(argument("ignore-y-hint", BoolArgumentType.bool()).executes(context -> {
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                    if (swarm.isHost()) {
+                        var pos = meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos");
+                        swarm.host.sendMessage(SwarmProtocol.smartGoTo(pos.getX(), pos.getY(), pos.getZ(), BoolArgumentType.getBool(context, "ignore-y-hint")));
+                    }
+                    else if (swarm.isWorker()) {
+                        BaritonePathManager baritone = getBaritone();
+                        if (baritone != null) baritone.smartMoveTo(meteordevelopment.meteorclient.commands.arguments.BlockPosArgumentType.getBlockPos(context, "pos"), BoolArgumentType.getBool(context, "ignore-y-hint"));
+                    }
+                    return SINGLE_SUCCESS;
+                }))))
+            .then(literal("mine")
+                .then(argument("block", BlockStateArgumentType.blockState(REGISTRY_ACCESS)).executes(context -> {
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (!swarm.isActive()) throw SWARM_NOT_ACTIVE.create();
+
+                    if (swarm.isHost()) {
+                        var block = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
+                        swarm.host.sendMessage(SwarmProtocol.mine(net.minecraft.registry.Registries.BLOCK.getId(block).toString()));
+                    }
+                    else if (swarm.isWorker()) {
+                        BaritonePathManager baritone = getBaritone();
+                        if (baritone != null) {
+                            var block = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
+                            baritone.mine(block);
+                        }
+                    }
+                    return SINGLE_SUCCESS;
+                }))
+            )
+        );
+
         builder.then(literal("exec").then(argument("command", StringArgumentType.greedyString()).executes(context -> {
             Swarm swarm = Modules.get().get(Swarm.class);
             if (swarm.isActive()) {
@@ -384,6 +523,12 @@ public class SwarmCommand extends Command {
             }
             return SINGLE_SUCCESS;
         })));
+    }
+
+    private @Nullable BaritonePathManager getBaritone() {
+        if (PathManagers.get() instanceof BaritonePathManager baritone) return baritone;
+        error("Baritone path manager not available.");
+        return null;
     }
 
     private void runInfinityMiner() {

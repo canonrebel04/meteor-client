@@ -524,6 +524,15 @@ public class Modules extends System<Modules> {
         add(new Trail());
         add(new Trajectories());
         add(new TunnelESP());
+        add(new NewChunks());
+        add(new CaveFinder());
+        add(new Navigator());
+        add(new CoordinateHud());
+        add(new PoiDetector());
+
+        if (BaritoneUtils.IS_AVAILABLE) {
+            add(new BaritonePathHud());
+        }
         add(new VoidESP());
         add(new WallHack());
         add(new WaypointsModule());
@@ -555,8 +564,13 @@ public class Modules extends System<Modules> {
         add(new SpawnProofer());
         add(new Timer());
         add(new VeinMiner());
+        add(new OreScanner());
 
         if (BaritoneUtils.IS_AVAILABLE) {
+            add(new AutoSmelt());
+            add(new AutoCraft());
+            add(new StorageScanner());
+            add(new BranchMiner());
             add(new Excavator());
             add(new InfinityMiner());
         }

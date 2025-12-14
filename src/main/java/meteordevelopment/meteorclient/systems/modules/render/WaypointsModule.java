@@ -21,6 +21,7 @@ import meteordevelopment.meteorclient.renderer.text.TextRenderer;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.waypoints.Waypoint;
 import meteordevelopment.meteorclient.systems.waypoints.Waypoints;
 import meteordevelopment.meteorclient.utils.Utils;
@@ -113,6 +114,8 @@ public class WaypointsModule extends Module {
             boolean waypointIsNear = waypoint.actionWhenNearCheck((int) Math.floor(dist));
             if (playerAlive && waypointIsNear) {
                 switch (waypoint.actionWhenNear.get()) {
+                    case Disabled -> {
+                    }
                     case Hide -> waypoint.visible.set(false);
                     case Delete -> {
                         toRemove.add(waypoint);
@@ -252,6 +255,15 @@ public class WaypointsModule extends Module {
                         PathManagers.get().stop();
 
                     PathManagers.get().moveTo(waypoint.getPos());
+                };
+
+                WButton navB = table.add(theme.button("Nav")).widget();
+                navB.action = () -> {
+                    Navigator nav = Modules.get().get(Navigator.class);
+                    if (nav != null) {
+                        nav.setWaypointTarget(waypoint.name.get());
+                        if (!nav.isActive()) nav.toggle();
+                    }
                 };
             }
 

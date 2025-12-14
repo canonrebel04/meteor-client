@@ -79,6 +79,9 @@ public class ProfilesTab extends Tab {
 
         @Override
         public void initWidgets() {
+            add(theme.label("Tip: Use 'load-on-join' in a profile to auto-apply it per server."))
+                .expandX();
+
             WTable table = add(theme.table()).expandX().minWidth(400).widget();
             initTable(table);
 
@@ -90,6 +93,33 @@ public class ProfilesTab extends Tab {
             WButton create = l.add(theme.button("Create")).expandX().widget();
             create.tooltip = "Create new profile";
             create.action = () -> mc.setScreen(new EditProfileScreen(theme, null, this::reload));
+
+            // Create defaults
+            WButton createDefaults = l.add(theme.button("Create Defaults")).expandX().widget();
+            createDefaults.tooltip = "Create Survival / Server-safe / Exploration profile templates";
+            createDefaults.action = () -> {
+                boolean createdAny = false;
+                createdAny |= createDefaultProfile("Survival", true, true, false, true);
+                createdAny |= createDefaultProfile("Server-safe", true, true, false, true);
+                createdAny |= createDefaultProfile("Exploration", true, true, false, true);
+
+                if (createdAny) {
+                    OkPrompt.create()
+                        .title("Defaults created")
+                        .message("Created default profile templates.")
+                        .message("Edit each profile to set 'load-on-join' for per-server auto-apply.")
+                        .dontShowAgainCheckboxVisible(false)
+                        .show();
+                } else {
+                    OkPrompt.create()
+                        .title("Defaults already exist")
+                        .message("No default profiles were created because they already exist.")
+                        .dontShowAgainCheckboxVisible(false)
+                        .show();
+                }
+
+                reload();
+            };
 
             // Import
             WButton importBtn = l.add(theme.button("Import")).expandX().widget();
@@ -118,6 +148,9 @@ public class ProfilesTab extends Tab {
             for (Profile profile : Profiles.get()) {
                 table.add(theme.label(profile.name.get())).expandCellX();
 
+                int autoCount = profile.loadOnJoin.get() != null ? profile.loadOnJoin.get().size() : 0;
+                table.add(theme.label(autoCount == 0 ? "Auto: —" : ("Auto: " + autoCount))).right();
+
                 WConfirmedButton save = theme.confirmedButton("Save", "Confirm");
                 save.action = profile::save;
                 table.add(save).right();
@@ -139,6 +172,20 @@ public class ProfilesTab extends Tab {
 
                 table.row();
             }
+        }
+
+        private boolean createDefaultProfile(String name, boolean saveModules, boolean saveHud, boolean saveMacros, boolean saveWaypoints) {
+            if (Profiles.get().get(name) != null) return false;
+
+            Profile p = new Profile();
+            p.name.set(name);
+            p.modules.set(saveModules);
+            p.hud.set(saveHud);
+            p.macros.set(saveMacros);
+            p.waypoints.set(saveWaypoints);
+
+            Profiles.get().add(p);
+            return true;
         }
 
         private Profile importProfile() throws IOException {

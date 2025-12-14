@@ -10,6 +10,8 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.misc.InventoryTweaks;
 import meteordevelopment.meteorclient.systems.modules.render.BetterTooltips;
 import meteordevelopment.meteorclient.systems.modules.render.ItemHighlight;
+import meteordevelopment.meteorclient.systems.autocraft.AutoCraftContext;
+import meteordevelopment.meteorclient.systems.autocraft.AutoCraftMemory;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -83,6 +85,38 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
                     .build()
             );
         }
+    }
+
+    // AutoCraft storage memory capture (best-effort)
+    @Inject(method = "handledScreenTick", at = @At("TAIL"))
+    private void onHandledScreenTick(CallbackInfo ci) {
+        if (!AutoCraftContext.hasPendingCapture()) return;
+        if (mc.player == null) return;
+
+        var pos = AutoCraftContext.getPendingContainerPos();
+        if (pos == null) return;
+
+        ScreenHandler handler = getScreenHandler();
+        if (handler == null) return;
+
+        // Heuristic: many storage containers are (N*9) slots plus the player's 36.
+        int slotCount = handler.slots.size();
+        int containerSlots = slotCount - 36;
+
+        // Capture only "storage-like" sizes to avoid polluting memory with furnaces/anvils/etc.
+        if (containerSlots < 9 || containerSlots > 54 || containerSlots % 9 != 0) {
+            return;
+        }
+
+        java.util.ArrayList<ItemStack> stacks = new java.util.ArrayList<>(containerSlots);
+        for (int i = 0; i < containerSlots && i < slotCount; i++) {
+            ItemStack s = handler.slots.get(i).getStack();
+            // copy to decouple from handler mutability
+            stacks.add(s == null ? ItemStack.EMPTY : s.copy());
+        }
+
+        AutoCraftMemory.get().recordContainer(pos, AutoCraftContext.getPendingDimension(), stacks);
+        AutoCraftContext.clearPendingCapture();
     }
 
     // Inventory Tweaks

@@ -7,6 +7,7 @@ package meteordevelopment.meteorclient.systems.modules.misc.swarm;
 
 import meteordevelopment.meteorclient.utils.network.MeteorExecutor;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
+import meteordevelopment.meteorclient.systems.modules.Modules;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -70,12 +71,36 @@ public class SwarmHost extends Thread {
 
     public void sendMessage(String s) {
         MeteorExecutor.execute(() -> {
+            String wrapped = wrapMessage(s);
             for (SwarmConnection connection : clientConnections) {
                 if (connection != null) {
-                    connection.messageToSend = s;
+                    connection.sendMessage(wrapped);
                 }
             }
         });
+    }
+
+    public void sendMessageTo(int index, String s) {
+        if (index < 0 || index >= clientConnections.length) return;
+
+        MeteorExecutor.execute(() -> {
+            SwarmConnection connection = clientConnections[index];
+            if (connection != null) connection.sendMessage(wrapMessage(s));
+        });
+    }
+
+    private String wrapMessage(String message) {
+        if (message == null) return null;
+
+        Swarm swarm = Modules.get().get(Swarm.class);
+        if (swarm == null) return message;
+        if (!swarm.requireToken.get()) return message;
+
+        String token = swarm.token.get();
+        if (token == null || token.isBlank()) return message;
+
+        // Worker will unwrap and validate before dispatching.
+        return "swarm|" + token + "|" + message;
     }
 
     public SwarmConnection[] getConnections() {

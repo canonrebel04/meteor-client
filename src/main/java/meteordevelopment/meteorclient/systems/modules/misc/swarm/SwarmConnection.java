@@ -10,14 +10,21 @@ import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class SwarmConnection extends Thread {
     public final Socket socket;
-    public String messageToSend;
+    private final BlockingQueue<String> outgoing = new LinkedBlockingQueue<>();
 
     public SwarmConnection(Socket socket) {
         this.socket = socket;
         start();
+    }
+
+    public void sendMessage(String message) {
+        if (message == null) return;
+        outgoing.offer(message);
     }
 
     @Override
@@ -28,16 +35,15 @@ public class SwarmConnection extends Thread {
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
             while (!isInterrupted()) {
-                if (messageToSend != null) {
-                    try {
-                        out.writeUTF(messageToSend);
-                        out.flush();
-                    } catch (Exception e) {
-                        ChatUtils.errorPrefix("Swarm", "Encountered error when sending command.");
-                        e.printStackTrace();
-                    }
-
-                    messageToSend = null;
+                try {
+                    String message = outgoing.take();
+                    out.writeUTF(message);
+                    out.flush();
+                } catch (InterruptedException e) {
+                    interrupt();
+                } catch (Exception e) {
+                    ChatUtils.errorPrefix("Swarm", "Encountered error when sending command.");
+                    e.printStackTrace();
                 }
             }
 

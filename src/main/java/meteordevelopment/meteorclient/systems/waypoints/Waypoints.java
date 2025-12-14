@@ -86,6 +86,7 @@ public class Waypoints extends System<Waypoints> implements Iterable<Waypoint> {
      * Adds a waypoint or saves it if it already exists
      * @return {@code true} if waypoint already exists
      */
+    @SuppressWarnings("deprecation")
     public boolean add(Waypoint waypoint) {
         if (waypoints.contains(waypoint)) {
             save();
@@ -100,6 +101,7 @@ public class Waypoints extends System<Waypoints> implements Iterable<Waypoint> {
         return false;
     }
 
+    @SuppressWarnings("deprecation")
     public boolean remove(Waypoint waypoint) {
         boolean removed = waypoints.remove(waypoint);
         if (removed) {

@@ -30,6 +30,7 @@ public class Config extends System<Config> {
     private final SettingGroup sgModules = settings.createGroup("Modules");
     private final SettingGroup sgChat = settings.createGroup("Chat");
     private final SettingGroup sgMisc = settings.createGroup("Misc");
+    private final SettingGroup sgAutomation = settings.createGroup("Automation");
 
     // Visual
 
@@ -119,6 +120,13 @@ public class Config extends System<Config> {
         .build()
     );
 
+    public final Setting<Boolean> cyberGlassModulesScreen = sgModules.add(new BoolSetting.Builder()
+        .name("cyber-glass-modules-screen")
+        .description("Use the opt-in Cyber-Glass Modules screen (inline quick settings).")
+        .defaultValue(false)
+        .build()
+    );
+
     public final Setting<Boolean> moduleAliases = sgModules.add(new BoolSetting.Builder()
         .name("search-module-aliases")
         .description("Whether or not module aliases will be used in the module search bar.")
@@ -166,7 +174,78 @@ public class Config extends System<Config> {
         .build()
     );
 
+    // Automation
+
+    public final Setting<Boolean> automationPauseOnLowHealth = sgAutomation.add(new BoolSetting.Builder()
+        .name("automation-pause-on-low-health")
+        .description("Pause automation queue while health is low.")
+        .defaultValue(true)
+        .build()
+    );
+
+    public final Setting<Double> automationLowHealthHpThreshold = sgAutomation.add(new DoubleSetting.Builder()
+        .name("automation-low-health-hp")
+        .description("Health (including absorption) at or below which automation is considered low-health.")
+        .defaultValue(6.0)
+        .min(0)
+        .sliderMax(20)
+        .visible(automationPauseOnLowHealth::get)
+        .build()
+    );
+
+    public final Setting<Boolean> automationPauseOnInventoryFull = sgAutomation.add(new BoolSetting.Builder()
+        .name("automation-pause-on-inventory-full")
+        .description("Pause automation queue while the main inventory is full.")
+        .defaultValue(true)
+        .build()
+    );
+
+    public final Setting<Boolean> automationAutoRecoverWhenStuck = sgAutomation.add(new BoolSetting.Builder()
+        .name("automation-auto-recover-when-stuck")
+        .description("Automatically trigger Recover once when the player becomes stuck during a task.")
+        .defaultValue(true)
+        .build()
+    );
+
+    public final Setting<Integer> automationUnreachableStartTimeoutTicks = sgAutomation.add(new IntSetting.Builder()
+        .name("automation-unreachable-start-timeout-ticks")
+        .description("If a task doesn't start pathing within this many ticks, mark it as unreachable.")
+        .defaultValue(60)
+        .min(5)
+        .sliderMax(200)
+        .build()
+    );
+
+    public final Setting<Integer> automationTaskEndIdleTicks = sgAutomation.add(new IntSetting.Builder()
+        .name("automation-task-end-idle-ticks")
+        .description("After pathing stops, wait this many idle ticks before marking the task complete.")
+        .defaultValue(5)
+        .min(1)
+        .sliderMax(40)
+        .build()
+    );
+
+    public final Setting<Integer> automationQueuePreviewLimit = sgAutomation.add(new IntSetting.Builder()
+        .name("automation-queue-preview-limit")
+        .description("How many queued tasks to include in the HUD/status queue preview.")
+        .defaultValue(2)
+        .min(0)
+        .sliderMax(10)
+        .build()
+    );
+
     public List<String> dontShowAgainPrompts = new ArrayList<>();
+
+    public List<String> aiAssistantHistory = new ArrayList<>();
+
+    public String aiAssistantProvider = "local";
+
+    // Command used to send prompts to GeminiInMinecraft. Different versions/configurations may
+    // expose separate commands for Q&A vs. tool-calling modes.
+    public String aiAssistantGeminiCommand = "/ai";
+
+    // Gemini model to use via GeminiInMinecraft. Applied by sending `/setupai model <name>`.
+    public String aiAssistantGeminiModel = "gemini-2.5-flash";
 
     public Config() {
         super("config");
@@ -183,6 +262,10 @@ public class Config extends System<Config> {
         tag.putString("version", MeteorClient.VERSION.toString());
         tag.put("settings", settings.toTag());
         tag.put("dontShowAgainPrompts", listToTag(dontShowAgainPrompts));
+        tag.put("aiAssistantHistory", listToTag(aiAssistantHistory));
+        tag.putString("aiAssistantProvider", aiAssistantProvider);
+        tag.putString("aiAssistantGeminiCommand", aiAssistantGeminiCommand);
+        tag.putString("aiAssistantGeminiModel", aiAssistantGeminiModel);
 
         return tag;
     }
@@ -191,6 +274,10 @@ public class Config extends System<Config> {
     public Config fromTag(NbtCompound tag) {
         if (tag.contains("settings")) settings.fromTag(tag.getCompoundOrEmpty("settings"));
         if (tag.contains("dontShowAgainPrompts")) dontShowAgainPrompts = listFromTag(tag, "dontShowAgainPrompts");
+        if (tag.contains("aiAssistantHistory")) aiAssistantHistory = listFromTag(tag, "aiAssistantHistory");
+        if (tag.contains("aiAssistantProvider")) aiAssistantProvider = tag.getString("aiAssistantProvider").orElse("local");
+        if (tag.contains("aiAssistantGeminiCommand")) aiAssistantGeminiCommand = tag.getString("aiAssistantGeminiCommand").orElse("/ai");
+        if (tag.contains("aiAssistantGeminiModel")) aiAssistantGeminiModel = tag.getString("aiAssistantGeminiModel").orElse("gemini-2.5-flash");
 
         return this;
     }

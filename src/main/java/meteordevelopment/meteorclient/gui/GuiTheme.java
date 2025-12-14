@@ -204,6 +204,10 @@ public abstract class GuiTheme implements ISerializable<GuiTheme> {
         return w(new WBlockPosEdit(value));
     }
 
+    public WBlockPosEdit blockPosEdit(BlockPos value, boolean showSetHereButton) {
+        return w(new WBlockPosEdit(value, true, showSetHereButton));
+    }
+
     public WKeybind keybind(Keybind keybind) {
         return keybind(keybind, Keybind.none());
     }

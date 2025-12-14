@@ -19,6 +19,8 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.util.Util;
 
+import java.util.List;
+
 public class Swarm extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
 
@@ -43,6 +45,53 @@ public class Swarm extends Module {
         .defaultValue(6969)
         .range(1, 65535)
         .noSlider()
+        .build()
+    );
+
+    public final Setting<Boolean> requireToken = sgGeneral.add(new BoolSetting.Builder()
+        .name("require-token")
+        .description("If enabled, workers will only accept commands wrapped with the correct shared token.")
+        .defaultValue(false)
+        .build()
+    );
+
+    public final Setting<String> token = sgGeneral.add(new StringSetting.Builder()
+        .name("token")
+        .description("Shared token used to authenticate swarm commands when require-token is enabled.")
+        .defaultValue("")
+        .visible(requireToken::get)
+        .build()
+    );
+
+    public final Setting<Boolean> requireTrustedHost = sgGeneral.add(new BoolSetting.Builder()
+        .name("require-trusted-host")
+        .description("If enabled, workers will only accept commands from trusted hosts (by IP/hostname). Default: ON (reject all until configured).")
+        .defaultValue(true)
+        .visible(() -> mode.get() == Mode.Worker)
+        .build()
+    );
+
+    public final Setting<List<String>> trustedHosts = sgGeneral.add(new StringListSetting.Builder()
+        .name("trusted-hosts")
+        .description("Trusted host IPs/hostnames allowed to control this worker (examples: localhost, 192.168.1.10).")
+        .defaultValue()
+        .visible(() -> mode.get() == Mode.Worker && requireTrustedHost.get())
+        .build()
+    );
+
+    public final Setting<Boolean> allowUnsafeCommands = sgGeneral.add(new BoolSetting.Builder()
+        .name("allow-unsafe-commands")
+        .description("If enabled, workers will execute any received 'swarm' command. If disabled, only an allowlisted subset is accepted.")
+        .defaultValue(false)
+        .build()
+    );
+
+    public final Setting<Integer> workerCommandsPerSecond = sgGeneral.add(new IntSetting.Builder()
+        .name("worker-commands-per-second")
+        .description("Worker-side rate limit for incoming swarm commands.")
+        .defaultValue(10)
+        .range(1, 100)
+        .sliderRange(1, 30)
         .build()
     );
 

@@ -17,12 +17,15 @@ import baritone.api.utils.input.Input;
 import baritone.api.utils.SettingsUtil;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.systems.config.Config;
+import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.orbit.EventPriority;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.entity.Entity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
@@ -34,17 +37,26 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
 public class BaritonePathManager implements IPathManager {
     private final BaritoneSettings settings;
 
+    private int tickCounter;
+
     private GoalDirection directionGoal;
     private boolean pathingPaused;
 
     private boolean safeMode;
     private SafeModeSnapshot safeModeSnapshot;
 
+    private Goal lastGoal;
+
     private final RecoveryController recoveryController;
     private int recoverCooldownTicks;
+    private int recoverBackoffLevel;
+    private int recoverLastAttemptTick;
 
     private final StuckTracker stuckTracker;
+    private final AutomationMacroRecorder macroRecorder;
     private final BaritoneTaskAgent agent;
+
+    private boolean miningProtectionActive;
 
     public BaritonePathManager() {
         // Subscribe to event bus
@@ -55,7 +67,8 @@ public class BaritonePathManager implements IPathManager {
 
         recoveryController = new RecoveryController();
         stuckTracker = new StuckTracker();
-        agent = new BaritoneTaskAgent(this);
+        macroRecorder = new AutomationMacroRecorder();
+        agent = new BaritoneTaskAgent(this, macroRecorder);
 
         // Baritone pathing control
         BaritoneAPI.getProvider().getPrimaryBaritone().getPathingControlManager().registerProcess(new BaritoneProcess());
@@ -67,6 +80,80 @@ public class BaritonePathManager implements IPathManager {
 
     public boolean isSafeMode() {
         return safeMode;
+    }
+
+    public boolean isStuck() {
+        return stuckTracker.isStuck();
+    }
+
+    public boolean isLowHealth() {
+        if (mc.player == null) return false;
+
+        float effectiveHealth = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+        double threshold = Config.get().automationLowHealthHpThreshold.get();
+        // Conservative default: treat 3 hearts (6hp) as "low".
+        if (threshold <= 0) threshold = 6.0;
+        return effectiveHealth <= (float) threshold;
+    }
+
+    public String getHazardSummary() {
+        if (mc.world == null || mc.player == null) return null;
+
+        BlockPos pos = mc.player.getBlockPos();
+
+        boolean lava = false;
+        boolean water = false;
+        boolean fallRisk = false;
+
+        BlockState at = mc.world.getBlockState(pos);
+        if (!at.getFluidState().isEmpty()) {
+            if (at.getFluidState().isIn(FluidTags.LAVA)) lava = true;
+            if (at.getFluidState().isIn(FluidTags.WATER)) water = true;
+        }
+
+        BlockState below = mc.world.getBlockState(pos.down());
+        if (!below.getFluidState().isEmpty()) {
+            if (below.getFluidState().isIn(FluidTags.LAVA)) lava = true;
+            if (below.getFluidState().isIn(FluidTags.WATER)) water = true;
+        }
+
+        // Conservative fall risk: only consider edges while on ground.
+        if (mc.player.isOnGround() && below.isAir()) fallRisk = true;
+
+        if (!lava && !water && !fallRisk) return null;
+        if (lava && water && fallRisk) return "Lava, Water, Fall";
+        if (lava && water) return "Lava, Water";
+        if (lava && fallRisk) return "Lava, Fall";
+        if (water && fallRisk) return "Water, Fall";
+        if (lava) return "Lava";
+        if (water) return "Water";
+        return "Fall";
+    }
+
+    public String getGoalSummary() {
+        var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
+        Goal goal = baritone.getCustomGoalProcess().getGoal();
+        if (goal == null) goal = lastGoal;
+        return goal != null ? goal.toString() : null;
+    }
+
+    public InventorySummary getInventorySummary() {
+        if (mc.player == null) return new InventorySummary(0, 0);
+
+        int used = 0;
+        // Use only main inventory + hotbar. Armor/offhand slots can be empty while the
+        // inventory is effectively full for generic items.
+        int total = Math.min(36, mc.player.getInventory().size());
+
+        for (int i = 0; i < total; i++) {
+            ItemStack stack = mc.player.getInventory().getStack(i);
+            if (!stack.isEmpty()) used++;
+        }
+
+        return new InventorySummary(used, total);
+    }
+
+    public record InventorySummary(int usedSlots, int totalSlots) {
     }
 
     public void setSafeMode(boolean enabled) {
@@ -92,6 +179,33 @@ public class BaritonePathManager implements IPathManager {
             setBaritoneSettingBoolean("allowParkourPlace", false);
             setBaritoneSettingBoolean("allowSprint", false);
             setBaritoneSettingBoolean("allowWaterBucketFall", false);
+
+            // Reduce destructive/path-risky behavior.
+            setBaritoneSettingBoolean("allowBreak", false);
+            setBaritoneSettingBoolean("allowPlace", false);
+            setBaritoneSettingBoolean("allowInventory", false);
+            setBaritoneSettingBoolean("allowDiagonalDescend", false);
+            setBaritoneSettingBoolean("allowDiagonalAscend", false);
+            setBaritoneSettingBoolean("allowDownward", false);
+            setBaritoneSettingBoolean("strictLiquidCheck", true);
+            setBaritoneSettingBoolean("cutoffAtLoadBoundary", true);
+
+            // Falling: keep conservative even if player has a bucket.
+            setBaritoneSettingInt("maxFallHeightNoWater", 3);
+            setBaritoneSettingInt("maxFallHeightBucket", 6);
+
+            // Avoidance: enable and enforce a small radius if available.
+            setBaritoneSettingBoolean("avoidance", true);
+            Integer mobRadius = getBaritoneSettingInt("mobAvoidanceRadius");
+            Integer spawnerRadius = getBaritoneSettingInt("mobSpawnerAvoidanceRadius");
+            if (mobRadius != null) setBaritoneSettingInt("mobAvoidanceRadius", Math.max(mobRadius, 16));
+            if (spawnerRadius != null) setBaritoneSettingInt("mobSpawnerAvoidanceRadius", Math.max(spawnerRadius, 24));
+
+            ChatUtils.infoPrefix("Baritone", "Safe Mode: ON (avoidance=%s, mobRadius=%s, spawnerRadius=%s)",
+                String.valueOf(getBaritoneSettingBoolean("avoidance")),
+                formatSettingInt(getBaritoneSettingInt("mobAvoidanceRadius")),
+                formatSettingInt(getBaritoneSettingInt("mobSpawnerAvoidanceRadius"))
+            );
         } else {
             // Restore explicit values first (if we captured them).
             if (safeModeSnapshot != null) {
@@ -109,12 +223,41 @@ public class BaritonePathManager implements IPathManager {
                 setBaritoneSettingBoolean("allowParkourPlace", BaritoneAPI.getSettings().allowParkourPlace.defaultValue);
                 setBaritoneSettingBoolean("allowSprint", BaritoneAPI.getSettings().allowSprint.defaultValue);
                 setBaritoneSettingBoolean("allowWaterBucketFall", BaritoneAPI.getSettings().allowWaterBucketFall.defaultValue);
+
+                setBaritoneSettingBoolean("allowBreak", BaritoneAPI.getSettings().allowBreak.defaultValue);
+                setBaritoneSettingBoolean("allowPlace", BaritoneAPI.getSettings().allowPlace.defaultValue);
+                setBaritoneSettingBoolean("allowInventory", BaritoneAPI.getSettings().allowInventory.defaultValue);
+                setBaritoneSettingBoolean("allowDiagonalDescend", BaritoneAPI.getSettings().allowDiagonalDescend.defaultValue);
+                setBaritoneSettingBoolean("allowDiagonalAscend", BaritoneAPI.getSettings().allowDiagonalAscend.defaultValue);
+                setBaritoneSettingBoolean("allowDownward", BaritoneAPI.getSettings().allowDownward.defaultValue);
+                setBaritoneSettingBoolean("strictLiquidCheck", BaritoneAPI.getSettings().strictLiquidCheck.defaultValue);
+                setBaritoneSettingBoolean("cutoffAtLoadBoundary", BaritoneAPI.getSettings().cutoffAtLoadBoundary.defaultValue);
+
+                setBaritoneSettingInt("maxFallHeightNoWater", BaritoneAPI.getSettings().maxFallHeightNoWater.defaultValue);
+                setBaritoneSettingInt("maxFallHeightBucket", BaritoneAPI.getSettings().maxFallHeightBucket.defaultValue);
+
+                setBaritoneSettingInt("mobAvoidanceRadius", BaritoneAPI.getSettings().mobAvoidanceRadius.defaultValue);
+                setBaritoneSettingInt("mobSpawnerAvoidanceRadius", BaritoneAPI.getSettings().mobSpawnerAvoidanceRadius.defaultValue);
             }
+
+            ChatUtils.infoPrefix("Baritone", "Safe Mode: OFF (avoidance=%s, mobRadius=%s, spawnerRadius=%s)",
+                String.valueOf(getBaritoneSettingBoolean("avoidance")),
+                formatSettingInt(getBaritoneSettingInt("mobAvoidanceRadius")),
+                formatSettingInt(getBaritoneSettingInt("mobSpawnerAvoidanceRadius"))
+            );
         }
     }
 
     public BaritoneTaskAgent getAgent() {
         return agent;
+    }
+
+    public AutomationMacroRecorder getMacroRecorder() {
+        return macroRecorder;
+    }
+
+    public AutomationBlackboard getAutomationBlackboard() {
+        return agent.getBlackboard();
     }
 
     @Override
@@ -140,6 +283,11 @@ public class BaritonePathManager implements IPathManager {
     @Override
     public void stop() {
         BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything();
+
+        if (miningProtectionActive) {
+            BaritoneUtils.releaseMiningProtection();
+            miningProtectionActive = false;
+        }
     }
 
     public void smartMoveTo(BlockPos pos) {
@@ -150,54 +298,93 @@ public class BaritonePathManager implements IPathManager {
         var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
 
         BlockPos self = mc.player != null ? mc.player.getBlockPos() : null;
-        boolean ignoreY = ignoreYHint || (self != null && Math.abs(self.getY() - pos.getY()) <= 3);
 
-        // If the target looks risky (fluid / void), stop near it instead of forcing exact arrival.
-        boolean hazardousTarget = isHazardousTarget(pos);
-        int approachRadius = (safeMode || hazardousTarget) ? 2 : 0;
+        SmartGotoDecision decision = SmartGotoDecision.decide(
+            ignoreYHint,
+            self != null ? self.getY() : null,
+            pos.getY(),
+            safeMode,
+            isHazardousTarget(pos)
+        );
 
-        if (ignoreY) {
-            baritone.getCustomGoalProcess().setGoalAndPath(new GoalXZ(pos.getX(), pos.getZ()));
+        if (decision.ignoreY) {
+            Goal goal = new GoalXZ(pos.getX(), pos.getZ());
+            lastGoal = goal;
+            baritone.getCustomGoalProcess().setGoalAndPath(goal);
             return;
         }
 
-        if (approachRadius > 0) {
-            baritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(pos, approachRadius));
+        if (decision.approachRadius > 0) {
+            Goal goal = new GoalNear(pos, decision.approachRadius);
+            lastGoal = goal;
+            baritone.getCustomGoalProcess().setGoalAndPath(goal);
             return;
         }
 
-        baritone.getCustomGoalProcess().setGoalAndPath(new GoalGetToBlock(pos));
+        Goal goal = new GoalGetToBlock(pos);
+        lastGoal = goal;
+        baritone.getCustomGoalProcess().setGoalAndPath(goal);
     }
 
     public void recover() {
-        if (recoverCooldownTicks > 0) return;
+        if (recoverCooldownTicks > 0) {
+            ChatUtils.warningPrefix("Baritone", "Recover: cooldown (%d ticks)", recoverCooldownTicks);
+            return;
+        }
+
+        if (mc.player == null) {
+            ChatUtils.warningPrefix("Baritone", "Recover: player not available.");
+            return;
+        }
 
         var baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
         Goal goal = baritone.getCustomGoalProcess().getGoal();
-        if (goal == null) return;
+        if (goal == null) goal = lastGoal;
+        if (goal == null) {
+            ChatUtils.warningPrefix("Baritone", "Recover: no active/previous goal to recover.");
+            return;
+        }
 
-        recoverCooldownTicks = 40;
+        int ticksSinceLastAttempt = RecoverBackoffPolicy.ticksSinceLastAttempt(tickCounter, recoverLastAttemptTick);
+        recoverBackoffLevel = RecoverBackoffPolicy.nextBackoffLevel(recoverBackoffLevel, ticksSinceLastAttempt);
+        recoverLastAttemptTick = tickCounter;
+
+        recoverCooldownTicks = RecoverBackoffPolicy.cooldownTicksForBackoffLevel(recoverBackoffLevel);
         recoveryController.start(goal);
+
+        if (stuckTracker.isStuck()) {
+            ChatUtils.infoPrefix("Baritone", "Recover: started (stuck=true, backoff=%d, cooldown=%dt).", recoverBackoffLevel, recoverCooldownTicks);
+        } else {
+            ChatUtils.infoPrefix("Baritone", "Recover: started (backoff=%d, cooldown=%dt).", recoverBackoffLevel, recoverCooldownTicks);
+        }
     }
 
     @Override
     public void moveTo(BlockPos pos, boolean ignoreY) {
         if (ignoreY) {
-            BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(new GoalXZ(pos.getX(), pos.getZ()));
+            Goal goal = new GoalXZ(pos.getX(), pos.getZ());
+            lastGoal = goal;
+            BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(goal);
             return;
         }
 
-        BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(new GoalGetToBlock(pos));
+        Goal goal = new GoalGetToBlock(pos);
+        lastGoal = goal;
+        BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(goal);
     }
 
     @Override
     public void moveInDirection(float yaw) {
         directionGoal = new GoalDirection(yaw);
+        lastGoal = directionGoal;
         BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(directionGoal);
     }
 
     @Override
     public void mine(Block... blocks) {
+        // Mining should still avoid breaking containers/redstone if possible.
+        BaritoneUtils.acquireMiningProtection();
+        miningProtectionActive = true;
         BaritoneAPI.getProvider().getPrimaryBaritone().getMineProcess().mine(blocks);
     }
 
@@ -223,7 +410,14 @@ public class BaritonePathManager implements IPathManager {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onTick(TickEvent.Pre event) {
+        tickCounter++;
         agent.tick();
+
+        // Release mining protection after mining/pathing ends.
+        if (miningProtectionActive && !isPathing()) {
+            BaritoneUtils.releaseMiningProtection();
+            miningProtectionActive = false;
+        }
 
         if (recoverCooldownTicks > 0) recoverCooldownTicks--;
         stuckTracker.tick();
@@ -355,6 +549,22 @@ public class BaritonePathManager implements IPathManager {
         return false;
     }
 
+    static final class SmartGotoDecision {
+        final boolean ignoreY;
+        final int approachRadius;
+
+        private SmartGotoDecision(boolean ignoreY, int approachRadius) {
+            this.ignoreY = ignoreY;
+            this.approachRadius = approachRadius;
+        }
+
+        static SmartGotoDecision decide(boolean ignoreYHint, Integer selfY, int targetY, boolean safeMode, boolean hazardousTarget) {
+            boolean ignoreY = ignoreYHint || (selfY != null && Math.abs(selfY - targetY) <= 3);
+            int approachRadius = (safeMode || hazardousTarget) ? 2 : 0;
+            return new SmartGotoDecision(ignoreY, approachRadius);
+        }
+    }
+
     private static void setBaritoneSettingBoolean(String name, boolean value) {
         try {
             var settings = BaritoneAPI.getSettings();
@@ -370,19 +580,84 @@ public class BaritonePathManager implements IPathManager {
         }
     }
 
+    private static void setBaritoneSettingInt(String name, int value) {
+        try {
+            var settings = BaritoneAPI.getSettings();
+            var field = settings.getClass().getDeclaredField(name);
+            Object obj = field.get(settings);
+            if (obj instanceof baritone.api.Settings.Setting<?> setting && setting.value instanceof Integer) {
+                @SuppressWarnings("unchecked")
+                baritone.api.Settings.Setting<Integer> intSetting = (baritone.api.Settings.Setting<Integer>) setting;
+                intSetting.value = value;
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static String formatSettingInt(Integer value) {
+        return value != null ? value.toString() : "n/a";
+    }
+
     private static final class SafeModeSnapshot {
         private final Boolean allowParkour;
         private final Boolean allowParkourAscend;
         private final Boolean allowParkourPlace;
         private final Boolean allowSprint;
         private final Boolean allowWaterBucketFall;
+        private final Boolean avoidance;
+        private final Integer mobAvoidanceRadius;
+        private final Integer mobSpawnerAvoidanceRadius;
 
-        private SafeModeSnapshot(Boolean allowParkour, Boolean allowParkourAscend, Boolean allowParkourPlace, Boolean allowSprint, Boolean allowWaterBucketFall) {
+        private final Boolean allowBreak;
+        private final Boolean allowPlace;
+        private final Boolean allowInventory;
+        private final Boolean allowDiagonalDescend;
+        private final Boolean allowDiagonalAscend;
+        private final Boolean allowDownward;
+        private final Boolean strictLiquidCheck;
+        private final Boolean cutoffAtLoadBoundary;
+        private final Integer maxFallHeightNoWater;
+        private final Integer maxFallHeightBucket;
+
+        private SafeModeSnapshot(
+            Boolean allowParkour,
+            Boolean allowParkourAscend,
+            Boolean allowParkourPlace,
+            Boolean allowSprint,
+            Boolean allowWaterBucketFall,
+            Boolean avoidance,
+            Integer mobAvoidanceRadius,
+            Integer mobSpawnerAvoidanceRadius,
+            Boolean allowBreak,
+            Boolean allowPlace,
+            Boolean allowInventory,
+            Boolean allowDiagonalDescend,
+            Boolean allowDiagonalAscend,
+            Boolean allowDownward,
+            Boolean strictLiquidCheck,
+            Boolean cutoffAtLoadBoundary,
+            Integer maxFallHeightNoWater,
+            Integer maxFallHeightBucket
+        ) {
             this.allowParkour = allowParkour;
             this.allowParkourAscend = allowParkourAscend;
             this.allowParkourPlace = allowParkourPlace;
             this.allowSprint = allowSprint;
             this.allowWaterBucketFall = allowWaterBucketFall;
+            this.avoidance = avoidance;
+            this.mobAvoidanceRadius = mobAvoidanceRadius;
+            this.mobSpawnerAvoidanceRadius = mobSpawnerAvoidanceRadius;
+
+            this.allowBreak = allowBreak;
+            this.allowPlace = allowPlace;
+            this.allowInventory = allowInventory;
+            this.allowDiagonalDescend = allowDiagonalDescend;
+            this.allowDiagonalAscend = allowDiagonalAscend;
+            this.allowDownward = allowDownward;
+            this.strictLiquidCheck = strictLiquidCheck;
+            this.cutoffAtLoadBoundary = cutoffAtLoadBoundary;
+            this.maxFallHeightNoWater = maxFallHeightNoWater;
+            this.maxFallHeightBucket = maxFallHeightBucket;
         }
 
         static SafeModeSnapshot capture() {
@@ -391,7 +666,21 @@ public class BaritonePathManager implements IPathManager {
                 getBaritoneSettingBoolean("allowParkourAscend"),
                 getBaritoneSettingBoolean("allowParkourPlace"),
                 getBaritoneSettingBoolean("allowSprint"),
-                getBaritoneSettingBoolean("allowWaterBucketFall")
+                getBaritoneSettingBoolean("allowWaterBucketFall"),
+                getBaritoneSettingBoolean("avoidance"),
+                getBaritoneSettingInt("mobAvoidanceRadius"),
+                getBaritoneSettingInt("mobSpawnerAvoidanceRadius"),
+
+                getBaritoneSettingBoolean("allowBreak"),
+                getBaritoneSettingBoolean("allowPlace"),
+                getBaritoneSettingBoolean("allowInventory"),
+                getBaritoneSettingBoolean("allowDiagonalDescend"),
+                getBaritoneSettingBoolean("allowDiagonalAscend"),
+                getBaritoneSettingBoolean("allowDownward"),
+                getBaritoneSettingBoolean("strictLiquidCheck"),
+                getBaritoneSettingBoolean("cutoffAtLoadBoundary"),
+                getBaritoneSettingInt("maxFallHeightNoWater"),
+                getBaritoneSettingInt("maxFallHeightBucket")
             );
         }
 
@@ -401,6 +690,20 @@ public class BaritonePathManager implements IPathManager {
             if (allowParkourPlace != null) setBaritoneSettingBoolean("allowParkourPlace", allowParkourPlace);
             if (allowSprint != null) setBaritoneSettingBoolean("allowSprint", allowSprint);
             if (allowWaterBucketFall != null) setBaritoneSettingBoolean("allowWaterBucketFall", allowWaterBucketFall);
+            if (avoidance != null) setBaritoneSettingBoolean("avoidance", avoidance);
+            if (mobAvoidanceRadius != null) setBaritoneSettingInt("mobAvoidanceRadius", mobAvoidanceRadius);
+            if (mobSpawnerAvoidanceRadius != null) setBaritoneSettingInt("mobSpawnerAvoidanceRadius", mobSpawnerAvoidanceRadius);
+
+            if (allowBreak != null) setBaritoneSettingBoolean("allowBreak", allowBreak);
+            if (allowPlace != null) setBaritoneSettingBoolean("allowPlace", allowPlace);
+            if (allowInventory != null) setBaritoneSettingBoolean("allowInventory", allowInventory);
+            if (allowDiagonalDescend != null) setBaritoneSettingBoolean("allowDiagonalDescend", allowDiagonalDescend);
+            if (allowDiagonalAscend != null) setBaritoneSettingBoolean("allowDiagonalAscend", allowDiagonalAscend);
+            if (allowDownward != null) setBaritoneSettingBoolean("allowDownward", allowDownward);
+            if (strictLiquidCheck != null) setBaritoneSettingBoolean("strictLiquidCheck", strictLiquidCheck);
+            if (cutoffAtLoadBoundary != null) setBaritoneSettingBoolean("cutoffAtLoadBoundary", cutoffAtLoadBoundary);
+            if (maxFallHeightNoWater != null) setBaritoneSettingInt("maxFallHeightNoWater", maxFallHeightNoWater);
+            if (maxFallHeightBucket != null) setBaritoneSettingInt("maxFallHeightBucket", maxFallHeightBucket);
         }
 
         private static Boolean getBaritoneSettingBoolean(String name) {
@@ -415,6 +718,27 @@ public class BaritonePathManager implements IPathManager {
             }
             return null;
         }
+
+        private static Integer getBaritoneSettingInt(String name) {
+            try {
+                var settings = BaritoneAPI.getSettings();
+                var field = settings.getClass().getDeclaredField(name);
+                Object obj = field.get(settings);
+                if (obj instanceof baritone.api.Settings.Setting setting && setting.value instanceof Integer i) {
+                    return i;
+                }
+            } catch (Throwable ignored) {
+            }
+            return null;
+        }
+    }
+
+    private static Boolean getBaritoneSettingBoolean(String name) {
+        return SafeModeSnapshot.getBaritoneSettingBoolean(name);
+    }
+
+    private static Integer getBaritoneSettingInt(String name) {
+        return SafeModeSnapshot.getBaritoneSettingInt(name);
     }
 
     private final class RecoveryController {

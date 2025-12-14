@@ -21,17 +21,24 @@ public class BlockPosPrompt extends Prompt<BlockPosPrompt> {
     private final BlockPos initial;
     private final BiConsumer<BlockPos, Boolean> onOk;
 
+    private boolean setHereButtonVisible = true;
+
     public BlockPosPrompt(GuiTheme theme, Screen parent, BlockPos initial, BiConsumer<BlockPos, Boolean> onOk) {
         super(theme, parent);
         this.initial = initial;
         this.onOk = onOk;
     }
 
+    public BlockPosPrompt setHereButtonVisible(boolean visible) {
+        this.setHereButtonVisible = visible;
+        return this;
+    }
+
     @Override
     protected void initialiseWidgets(PromptScreen screen) {
         screen.add(theme.label("Target position:")).expandX();
 
-        WBlockPosEdit posEdit = screen.add(theme.blockPosEdit(initial)).expandX().widget();
+        WBlockPosEdit posEdit = screen.add(theme.blockPosEdit(initial, setHereButtonVisible)).expandX().widget();
 
         WHorizontalList opts = screen.add(theme.horizontalList()).expandX().widget();
         WCheckbox ignoreY = opts.add(theme.checkbox(false)).widget();
