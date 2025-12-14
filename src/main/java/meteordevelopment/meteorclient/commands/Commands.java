@@ -67,6 +67,9 @@ public class Commands {
         add(new InputCommand());
         add(new WaspCommand());
         add(new LocateCommand());
+        add(new HomeCommand());
+        add(new AvoidanceCommand());
+        add(new StorageCommand());
 
         COMMANDS.sort(Comparator.comparing(Command::getName));
 
@@ -93,18 +96,25 @@ public class Commands {
     }
 
     /**
-     * Argument types that rely on Minecraft registries access those registries through a {@link CommandRegistryAccess}
-     * object. Since dynamic registries are specific to each server, we need to make a new CommandRegistryAccess object
+     * Argument types that rely on Minecraft registries access those registries
+     * through a {@link CommandRegistryAccess}
+     * object. Since dynamic registries are specific to each server, we need to make
+     * a new CommandRegistryAccess object
      * every time we join a server.
      * <p>
-     * The command tree and by extension the {@link CommandDispatcher} also have to be rebuilt because:
+     * The command tree and by extension the {@link CommandDispatcher} also have to
+     * be rebuilt because:
      * <ol>
-     * <li>Argument types that require registries use a registry wrapper object that is created and stored in the
-     *     argument type objects when the command tree is built.
-     * <li>Registry entries and keys are compared using referential equality. Even if the data encoded is the same,
-     *     registry wrapper objects' dynamic data becomes stale after joining another server.
-     * <li>The CommandDispatcher's node merging only adds missing children, it cannot replace stale argument type
-     *     objects.
+     * <li>Argument types that require registries use a registry wrapper object that
+     * is created and stored in the
+     * argument type objects when the command tree is built.
+     * <li>Registry entries and keys are compared using referential equality. Even
+     * if the data encoded is the same,
+     * registry wrapper objects' dynamic data becomes stale after joining another
+     * server.
+     * <li>The CommandDispatcher's node merging only adds missing children, it
+     * cannot replace stale argument type
+     * objects.
      * </ol>
      *
      * @author Crosby
@@ -112,7 +122,8 @@ public class Commands {
     @EventHandler
     private static void onJoin(GameJoinedEvent event) {
         ClientPlayNetworkHandler networkHandler = mc.getNetworkHandler();
-        Command.REGISTRY_ACCESS = CommandRegistryAccess.of(networkHandler.getRegistryManager(), networkHandler.getEnabledFeatures());
+        Command.REGISTRY_ACCESS = CommandRegistryAccess.of(networkHandler.getRegistryManager(),
+                networkHandler.getEnabledFeatures());
 
         DISPATCHER = new CommandDispatcher<>();
         for (Command command : COMMANDS) {

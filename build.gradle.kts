@@ -48,6 +48,10 @@ repositories {
             includeGroup("maven.modrinth")
         }
     }
+    
+    flatDir {
+        dirs("/home/cachy/.local/share/PrismLauncher/instances/1.21.10/minecraft/mods")
+    }
 }
 
 val modInclude: Configuration by configurations.creating
@@ -89,7 +93,7 @@ dependencies {
     modCompileOnly(libs.viafabricplus) { isTransitive = false }
     modCompileOnly(libs.viafabricplus.api) { isTransitive = false }
 
-    modCompileOnly(libs.baritone)
+    modCompileOnly(files("/home/cachy/.local/share/PrismLauncher/instances/1.21.10/minecraft/mods/baritone-standalone-fabric-1.21.10-SNAPSHOT.jar")) // (libs.baritone)
     modCompileOnly(libs.modmenu)
 
     // Libraries (JAR-in-JAR)

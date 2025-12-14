@@ -84,7 +84,8 @@ public class Modules extends System<Modules> {
     public void load(File folder) {
         for (Module module : getAll()) {
             for (SettingGroup group : module.settings) {
-                for (Setting<?> setting : group) setting.reset();
+                for (Setting<?> setting : group)
+                    setting.reset();
             }
         }
 
@@ -98,7 +99,9 @@ public class Modules extends System<Modules> {
     }
 
     public static void registerCategory(Category category) {
-        if (!Categories.REGISTERING) throw new RuntimeException("Modules.registerCategory - Cannot register category outside of onRegisterCategories callback.");
+        if (!Categories.REGISTERING)
+            throw new RuntimeException(
+                    "Modules.registerCategory - Cannot register category outside of onRegisterCategories callback.");
 
         CATEGORIES.add(category);
     }
@@ -121,7 +124,8 @@ public class Modules extends System<Modules> {
     @Nullable
     public Module get(String name) {
         for (Module module : moduleInstances.values()) {
-            if (module.name.equalsIgnoreCase(name)) return module;
+            if (module.name.equalsIgnoreCase(name))
+                return module;
         }
 
         return null;
@@ -139,7 +143,6 @@ public class Modules extends System<Modules> {
     public Collection<Module> getAll() {
         return moduleInstances.values();
     }
-
 
     public int getCount() {
         return moduleInstances.size();
@@ -183,7 +186,8 @@ public class Modules extends System<Modules> {
             for (SettingGroup sg : module.settings) {
                 for (Setting<?> setting : sg) {
                     int score = Utils.searchLevenshteinDefault(setting.title, text, false);
-                    if (score < lowest) lowest = score;
+                    if (score < lowest)
+                        lowest = score;
                 }
             }
             modules.put(module, modules.getOrDefault(module, 0) + lowest);
@@ -217,7 +221,7 @@ public class Modules extends System<Modules> {
 
     /***
      * @see meteordevelopment.meteorclient.commands.commands.BindCommand
-     * For ensuring we don't instantly bind the module to the enter key.
+     *      For ensuring we don't instantly bind the module to the enter key.
      */
     public void awaitKeyRelease() {
         this.awaitingKeyRelease = true;
@@ -229,19 +233,23 @@ public class Modules extends System<Modules> {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onKeyBinding(KeyEvent event) {
-        if (event.action == KeyAction.Release && onBinding(true, event.key(), event.modifiers())) event.cancel();
+        if (event.action == KeyAction.Release && onBinding(true, event.key(), event.modifiers()))
+            event.cancel();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onButtonBinding(MouseClickEvent event) {
-        if (event.action == KeyAction.Release && onBinding(false, event.button(), 0)) event.cancel();
+        if (event.action == KeyAction.Release && onBinding(false, event.button(), 0))
+            event.cancel();
     }
 
     private boolean onBinding(boolean isKey, int value, int modifiers) {
-        if (!isBinding()) return false;
+        if (!isBinding())
+            return false;
 
         if (awaitingKeyRelease) {
-            if (!isKey || (value != GLFW.GLFW_KEY_ENTER && value != GLFW.GLFW_KEY_KP_ENTER)) return false;
+            if (!isKey || (value != GLFW.GLFW_KEY_ENTER && value != GLFW.GLFW_KEY_KP_ENTER))
+                return false;
 
             awaitingKeyRelease = false;
             return false;
@@ -250,12 +258,11 @@ public class Modules extends System<Modules> {
         if (moduleToBind.keybind.canBindTo(isKey, value, modifiers)) {
             moduleToBind.keybind.set(isKey, value, modifiers);
             moduleToBind.info("Bound to (highlight)%s(default).", moduleToBind.keybind);
-        }
-        else if (value == GLFW.GLFW_KEY_ESCAPE) {
+        } else if (value == GLFW.GLFW_KEY_ESCAPE) {
             moduleToBind.keybind.set(Keybind.none());
             moduleToBind.info("Removed bind.");
-        }
-        else return false;
+        } else
+            return false;
 
         MeteorClient.EVENT_BUS.post(ModuleBindChangedEvent.get(moduleToBind));
         moduleToBind = null;
@@ -265,21 +272,25 @@ public class Modules extends System<Modules> {
 
     @EventHandler(priority = EventPriority.HIGH)
     private void onKey(KeyEvent event) {
-        if (event.action == KeyAction.Repeat) return;
+        if (event.action == KeyAction.Repeat)
+            return;
         onAction(true, event.key(), event.modifiers(), event.action == KeyAction.Press);
     }
 
     @EventHandler(priority = EventPriority.HIGH)
     private void onMouseClick(MouseClickEvent event) {
-        if (event.action == KeyAction.Repeat) return;
+        if (event.action == KeyAction.Repeat)
+            return;
         onAction(false, event.button(), 0, event.action == KeyAction.Press);
     }
 
     private void onAction(boolean isKey, int value, int modifiers, boolean isPress) {
-        if (mc.currentScreen != null || Input.isKeyPressed(GLFW.GLFW_KEY_F3)) return;
+        if (mc.currentScreen != null || Input.isKeyPressed(GLFW.GLFW_KEY_F3))
+            return;
 
         for (Module module : moduleInstances.values()) {
-            if (module.keybind.matches(isKey, value, modifiers) && (isPress || (module.toggleOnBindRelease && module.isActive()))) {
+            if (module.keybind.matches(isKey, value, modifiers)
+                    && (isPress || (module.toggleOnBindRelease && module.isActive()))) {
                 module.toggle();
                 module.sendToggledMsg();
             }
@@ -290,7 +301,8 @@ public class Modules extends System<Modules> {
 
     @EventHandler(priority = EventPriority.HIGHEST + 1)
     private void onOpenScreen(OpenScreenEvent event) {
-        if (!Utils.canUpdate()) return;
+        if (!Utils.canUpdate())
+            return;
 
         for (Module module : moduleInstances.values()) {
             if (module.toggleOnBindRelease && module.isActive()) {
@@ -339,7 +351,8 @@ public class Modules extends System<Modules> {
         NbtList modulesTag = new NbtList();
         for (Module module : getAll()) {
             NbtCompound moduleTag = module.toTag();
-            if (moduleTag != null) modulesTag.add(moduleTag);
+            if (moduleTag != null)
+                modulesTag.add(moduleTag);
         }
         tag.put("modules", modulesTag);
 
@@ -354,7 +367,8 @@ public class Modules extends System<Modules> {
         for (NbtElement moduleTagI : modulesTag) {
             NbtCompound moduleTag = (NbtCompound) moduleTagI;
             Module module = get(moduleTag.getString("name", ""));
-            if (module != null) module.fromTag(moduleTag);
+            if (module != null)
+                module.fromTag(moduleTag);
         }
 
         return this;
@@ -401,6 +415,7 @@ public class Modules extends System<Modules> {
         add(new AutoCity());
         add(new AutoEXP());
         add(new AutoLog());
+        add(new AutoReturn());
         add(new AutoTotem());
         add(new AutoTrap());
         add(new AutoWeapon());
@@ -420,6 +435,7 @@ public class Modules extends System<Modules> {
         add(new SelfTrap());
         add(new SelfWeb());
         add(new Surround());
+        add(new CombatMovement());
     }
 
     private void initPlayer() {
@@ -481,6 +497,8 @@ public class Modules extends System<Modules> {
         add(new ReverseStep());
         add(new SafeWalk());
         add(new Scaffold());
+        add(new AutoFarm());
+        add(new TreeFarm());
         add(new Slippy());
         add(new Sneak());
         add(new Speed());

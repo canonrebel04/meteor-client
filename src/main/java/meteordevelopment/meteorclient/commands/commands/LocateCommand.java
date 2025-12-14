@@ -5,7 +5,6 @@
 
 package meteordevelopment.meteorclient.commands.commands;
 
-import baritone.api.BaritoneAPI;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.commands.Command;
@@ -30,7 +29,7 @@ import net.minecraft.item.Items;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
+
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -42,29 +41,25 @@ public class LocateCommand extends Command {
     private Vec3d secondStart, secondEnd;
 
     private final List<Block> netherFortressBlocks = List.of(
-        Blocks.NETHER_BRICKS,
-        Blocks.NETHER_BRICK_FENCE,
-        Blocks.NETHER_WART
-    );
+            Blocks.NETHER_BRICKS,
+            Blocks.NETHER_BRICK_FENCE,
+            Blocks.NETHER_WART);
 
     private final List<Block> monumentBlocks = List.of(
-        Blocks.PRISMARINE_BRICKS,
-        Blocks.SEA_LANTERN,
-        Blocks.DARK_PRISMARINE
-    );
+            Blocks.PRISMARINE_BRICKS,
+            Blocks.SEA_LANTERN,
+            Blocks.DARK_PRISMARINE);
 
     private final List<Block> strongholdBlocks = List.of(
-        Blocks.END_PORTAL_FRAME
-    );
+            Blocks.END_PORTAL_FRAME);
 
     private final List<Block> endCityBlocks = List.of(
-        Blocks.PURPUR_BLOCK,
-        Blocks.PURPUR_PILLAR,
-        Blocks.PURPUR_SLAB,
-        Blocks.PURPUR_STAIRS,
-        Blocks.END_STONE_BRICKS,
-        Blocks.END_ROD
-    );
+            Blocks.PURPUR_BLOCK,
+            Blocks.PURPUR_PILLAR,
+            Blocks.PURPUR_SLAB,
+            Blocks.PURPUR_STAIRS,
+            Blocks.END_STONE_BRICKS,
+            Blocks.END_ROD);
 
     public LocateCommand() {
         super("locate", "Locates structures", "loc");
@@ -77,8 +72,9 @@ public class LocateCommand extends Command {
         builder.then(literal("buried_treasure").executes(s -> {
             ItemStack stack = mc.player.getInventory().getSelectedStack();
             if (stack.getItem() != Items.FILLED_MAP
-                || stack.get(DataComponentTypes.ITEM_NAME) == null
-                || !stack.get(DataComponentTypes.ITEM_NAME).getString().equals(Text.translatable("filled_map.buried_treasure").getString())) {
+                    || stack.get(DataComponentTypes.ITEM_NAME) == null
+                    || !stack.get(DataComponentTypes.ITEM_NAME).getString()
+                            .equals(Text.translatable("filled_map.buried_treasure").getString())) {
                 error("You need to hold a (highlight)buried treasure map(default)!");
                 return SINGLE_SUCCESS;
             }
@@ -107,8 +103,9 @@ public class LocateCommand extends Command {
         builder.then(literal("mansion").executes(s -> {
             ItemStack stack = mc.player.getInventory().getSelectedStack();
             if (stack.getItem() != Items.FILLED_MAP
-                || stack.get(DataComponentTypes.ITEM_NAME) == null
-                || !stack.get(DataComponentTypes.ITEM_NAME).getString().equals(Text.translatable("filled_map.mansion").getString())) {
+                    || stack.get(DataComponentTypes.ITEM_NAME) == null
+                    || !stack.get(DataComponentTypes.ITEM_NAME).getString()
+                            .equals(Text.translatable("filled_map.mansion").getString())) {
                 error("You need to hold a (highlight)woodland explorer map(default)!");
                 return SINGLE_SUCCESS;
             }
@@ -137,8 +134,9 @@ public class LocateCommand extends Command {
         builder.then(literal("monument").executes(s -> {
             ItemStack stack = mc.player.getInventory().getSelectedStack();
             if (stack.getItem() == Items.FILLED_MAP
-                && stack.get(DataComponentTypes.ITEM_NAME) != null
-                && stack.get(DataComponentTypes.ITEM_NAME).getString().equals(Text.translatable("filled_map.monument").getString())) {
+                    && stack.get(DataComponentTypes.ITEM_NAME) != null
+                    && stack.get(DataComponentTypes.ITEM_NAME).getString()
+                            .equals(Text.translatable("filled_map.monument").getString())) {
 
                 MapDecorationsComponent mapDecorationsComponent = stack.get(DataComponentTypes.MAP_DECORATIONS);
                 if (mapDecorationsComponent == null) {
@@ -161,7 +159,8 @@ public class LocateCommand extends Command {
                 return SINGLE_SUCCESS;
             }
 
-            // If the player is not holding a valid map, try to locate the monument using Baritone
+            // If the player is not holding a valid map, try to locate the monument using
+            // Baritone
             if (BaritoneUtils.IS_AVAILABLE) {
                 Vec3d coords = findByBlockList(monumentBlocks);
                 if (coords == null) {
@@ -183,7 +182,8 @@ public class LocateCommand extends Command {
             boolean foundEye = InvUtils.testInHotbar(Items.ENDER_EYE);
 
             if (foundEye) {
-                if (BaritoneUtils.IS_AVAILABLE) PathManagers.get().follow(EyeOfEnderEntity.class::isInstance);
+                if (BaritoneUtils.IS_AVAILABLE)
+                    PathManagers.get().follow(EyeOfEnderEntity.class::isInstance);
                 firstStart = null;
                 firstEnd = null;
                 secondStart = null;
@@ -301,14 +301,23 @@ public class LocateCommand extends Command {
     }
 
     private @Nullable Vec3d findByBlockList(List<Block> blockList) {
-        List<BlockPos> posList = BaritoneAPI.getProvider().getWorldScanner().scanChunkRadius(BaritoneAPI.getProvider().getPrimaryBaritone().getPlayerContext(), blockList, 64, 10, 32);
-        if (posList.isEmpty()) {
-            return null;
-        }
-        if (posList.size() < 3) {
-            warning("Only %d block(s) found. This search might be a false positive.", posList.size());
-        }
-        return new Vec3d(posList.getFirst().getX(), posList.getFirst().getY(), posList.getFirst().getZ());
+        // Disabled: WorldScanner wrapper missing
+        return null;
+        /*
+         * List<BlockPos> posList =
+         * BaritoneAPI.getProvider().getWorldScanner().scanChunkRadius(BaritoneAPI.
+         * getProvider().getPrimaryBaritone().getPlayerContext(), blockList, 64, 10,
+         * 32);
+         * if (posList.isEmpty()) {
+         * return null;
+         * }
+         * if (posList.size() < 3) {
+         * warning("Only %d block(s) found. This search might be a false positive.",
+         * posList.size());
+         * }
+         * return new Vec3d(posList.getFirst().getX(), posList.getFirst().getY(),
+         * posList.getFirst().getZ());
+         */
     }
 
     @EventHandler
@@ -355,10 +364,12 @@ public class LocateCommand extends Command {
             return;
         }
 
-        final double[] start = new double[]{this.secondStart.x, this.secondStart.z, this.secondEnd.x, this.secondEnd.z};
-        final double[] end = new double[]{this.firstStart.x, this.firstStart.z, this.firstEnd.x, this.firstEnd.z};
+        final double[] start = new double[] { this.secondStart.x, this.secondStart.z, this.secondEnd.x,
+                this.secondEnd.z };
+        final double[] end = new double[] { this.firstStart.x, this.firstStart.z, this.firstEnd.x, this.firstEnd.z };
         final double[] intersection = calcIntersection(start, end);
-        if (Double.isNaN(intersection[0]) || Double.isNaN(intersection[1]) || Double.isInfinite(intersection[0]) || Double.isInfinite(intersection[1])) {
+        if (Double.isNaN(intersection[0]) || Double.isNaN(intersection[1]) || Double.isInfinite(intersection[0])
+                || Double.isInfinite(intersection[1])) {
             error("Unable to calculate intersection.");
             cancel();
             return;
@@ -383,6 +394,6 @@ public class LocateCommand extends Command {
 
         final double delta = a1 * b2 - a2 * b1;
 
-        return new double[]{(b2 * c1 - b1 * c2) / delta, (a1 * c2 - a2 * c1) / delta};
+        return new double[] { (b2 * c1 - b1 * c2) / delta, (a1 * c2 - a2 * c1) / delta };
     }
 }

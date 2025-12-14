@@ -33,86 +33,81 @@ public class Waypoint implements ISerializable<Waypoint> {
     }
 
     public Setting<String> name = sgVisual.add(new StringSetting.Builder()
-        .name("name")
-        .description("The name of the waypoint.")
-        .defaultValue("Home")
-        .build()
-    );
+            .name("name")
+            .description("The name of the waypoint.")
+            .defaultValue("Home")
+            .build());
+
+    public Setting<String> tags = sgVisual.add(new StringSetting.Builder()
+            .name("tags")
+            .description("Comma separated tags for the waypoint.")
+            .defaultValue("")
+            .build());
 
     public Setting<String> icon = sgVisual.add(new ProvidedStringSetting.Builder()
-        .name("icon")
-        .description("The icon of the waypoint.")
-        .defaultValue("Square")
-        .supplier(() -> Waypoints.BUILTIN_ICONS)
-        .onChanged(v -> validateIcon())
-        .build()
-    );
+            .name("icon")
+            .description("The icon of the waypoint.")
+            .defaultValue("Square")
+            .supplier(() -> Waypoints.BUILTIN_ICONS)
+            .onChanged(v -> validateIcon())
+            .build());
 
     public Setting<SettingColor> color = sgVisual.add(new ColorSetting.Builder()
-        .name("color")
-        .description("The color of the waypoint.")
-        .defaultValue(MeteorClient.ADDON.color.toSetting())
-        .build()
-    );
+            .name("color")
+            .description("The color of the waypoint.")
+            .defaultValue(MeteorClient.ADDON.color.toSetting())
+            .build());
 
     public Setting<Boolean> visible = sgVisual.add(new BoolSetting.Builder()
-        .name("visible")
-        .description("Whether to show the waypoint.")
-        .defaultValue(true)
-        .build()
-    );
+            .name("visible")
+            .description("Whether to show the waypoint.")
+            .defaultValue(true)
+            .build());
 
     public Setting<Integer> maxVisible = sgVisual.add(new IntSetting.Builder()
-        .name("max-visible-distance")
-        .description("How far away to render the waypoint.")
-        .defaultValue(5000)
-        .build()
-    );
+            .name("max-visible-distance")
+            .description("How far away to render the waypoint.")
+            .defaultValue(5000)
+            .build());
 
     public Setting<Double> scale = sgVisual.add(new DoubleSetting.Builder()
-        .name("scale")
-        .description("The scale of the waypoint.")
-        .defaultValue(1.5)
-        .build()
-    );
+            .name("scale")
+            .description("The scale of the waypoint.")
+            .defaultValue(1.5)
+            .build());
 
     public Setting<BlockPos> pos = sgPosition.add(new BlockPosSetting.Builder()
-        .name("location")
-        .description("The location of the waypoint.")
-        .defaultValue(BlockPos.ORIGIN)
-        .build()
-    );
+            .name("location")
+            .description("The location of the waypoint.")
+            .defaultValue(BlockPos.ORIGIN)
+            .build());
 
     public Setting<Dimension> dimension = sgPosition.add(new EnumSetting.Builder<Dimension>()
-        .name("dimension")
-        .description("Which dimension the waypoint is in.")
-        .defaultValue(Dimension.Overworld)
-        .build()
-    );
+            .name("dimension")
+            .description("Which dimension the waypoint is in.")
+            .defaultValue(Dimension.Overworld)
+            .build());
 
     public Setting<Boolean> opposite = sgPosition.add(new BoolSetting.Builder()
-        .name("opposite-dimension")
-        .description("Whether to show the waypoint in the opposite dimension.")
-        .defaultValue(true)
-        .visible(() -> dimension.get() != Dimension.End)
-        .build()
-    );
+            .name("opposite-dimension")
+            .description("Whether to show the waypoint in the opposite dimension.")
+            .defaultValue(true)
+            .visible(() -> dimension.get() != Dimension.End)
+            .build());
 
     public Setting<NearAction> actionWhenNear = sgPosition.add(new EnumSetting.Builder<NearAction>()
-        .name("action-when-near")
-        .description("Action to be performed when the player is near.")
-        .defaultValue(NearAction.Disabled)
-        .build()
-    );
+            .name("action-when-near")
+            .description("Action to be performed when the player is near.")
+            .defaultValue(NearAction.Disabled)
+            .build());
 
     public Setting<Integer> actionWhenNearDistance = sgPosition.add(new IntSetting.Builder()
-        .name("action-when-near-distance")
-        .description("How close (in blocks) the player has to be for the near action to be performed.")
-        .defaultValue(8)
-        .sliderRange(0, 32)
-        .visible(() -> actionWhenNear.get() != NearAction.Disabled)
-        .build()
-    );
+            .name("action-when-near-distance")
+            .description("How close (in blocks) the player has to be for the near action to be performed.")
+            .defaultValue(8)
+            .sliderRange(0, 32)
+            .visible(() -> actionWhenNear.get() != NearAction.Disabled)
+            .build());
 
     public final UUID uuid;
     public final long createdAt;
@@ -136,7 +131,8 @@ public class Waypoint implements ISerializable<Waypoint> {
 
     public void renderIcon(double x, double y, double a, double size) {
         AbstractTexture texture = Waypoints.get().icons.get(icon.get());
-        if (texture == null) return;
+        if (texture == null)
+            return;
 
         int preA = color.get().a;
         color.get().a *= a;
@@ -153,7 +149,8 @@ public class Waypoint implements ISerializable<Waypoint> {
         BlockPos pos = this.pos.get();
 
         Dimension currentDim = PlayerUtils.getDimension();
-        if (dim == currentDim || dim.equals(Dimension.End)) return this.pos.get();
+        if (dim == currentDim || dim.equals(Dimension.End))
+            return this.pos.get();
 
         return switch (dim) {
             case Overworld -> new BlockPos(pos.getX() / 8, pos.getY(), pos.getZ() / 8);
@@ -164,7 +161,8 @@ public class Waypoint implements ISerializable<Waypoint> {
 
     public boolean actionWhenNearCheck(int distance) {
         // Add cooldown to near check, to account for death event inaccuracies
-        if ((System.currentTimeMillis() - createdAt) < waypointActionCooldown) return false;
+        if ((System.currentTimeMillis() - createdAt) < waypointActionCooldown)
+            return false;
 
         return actionWhenNearDistance.get() >= distance;
     }
@@ -179,7 +177,7 @@ public class Waypoint implements ISerializable<Waypoint> {
     }
 
     public static class Builder {
-        private String name = "", icon = "";
+        private String name = "", icon = "", tags = "";
         private BlockPos pos = BlockPos.ORIGIN;
         private Dimension dimension = Dimension.Overworld;
 
@@ -190,6 +188,11 @@ public class Waypoint implements ISerializable<Waypoint> {
 
         public Builder icon(String icon) {
             this.icon = icon;
+            return this;
+        }
+
+        public Builder tags(String tags) {
+            this.tags = tags;
             return this;
         }
 
@@ -206,10 +209,16 @@ public class Waypoint implements ISerializable<Waypoint> {
         public Waypoint build() {
             Waypoint waypoint = new Waypoint();
 
-            if (!name.equals(waypoint.name.getDefaultValue())) waypoint.name.set(name);
-            if (!icon.equals(waypoint.icon.getDefaultValue())) waypoint.icon.set(icon);
-            if (!pos.equals(waypoint.pos.getDefaultValue())) waypoint.pos.set(pos);
-            if (!dimension.equals(waypoint.dimension.getDefaultValue())) waypoint.dimension.set(dimension);
+            if (!name.equals(waypoint.name.getDefaultValue()))
+                waypoint.name.set(name);
+            if (!icon.equals(waypoint.icon.getDefaultValue()))
+                waypoint.icon.set(icon);
+            if (!tags.equals(waypoint.tags.getDefaultValue()))
+                waypoint.tags.set(tags);
+            if (!pos.equals(waypoint.pos.getDefaultValue()))
+                waypoint.pos.set(pos);
+            if (!dimension.equals(waypoint.dimension.getDefaultValue()))
+                waypoint.dimension.set(dimension);
 
             return waypoint;
         }
@@ -236,8 +245,10 @@ public class Waypoint implements ISerializable<Waypoint> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         Waypoint waypoint = (Waypoint) o;
         return Objects.equals(uuid, waypoint.uuid);
     }

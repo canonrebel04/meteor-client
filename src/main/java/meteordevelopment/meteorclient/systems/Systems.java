@@ -18,6 +18,8 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.profiles.Profiles;
 import meteordevelopment.meteorclient.systems.proxies.Proxies;
 import meteordevelopment.meteorclient.systems.waypoints.Waypoints;
+import meteordevelopment.meteorclient.systems.modules.world.AvoidanceManager;
+import meteordevelopment.meteorclient.systems.modules.combat.ThreatManager;
 import meteordevelopment.orbit.EventHandler;
 
 import java.io.File;
@@ -50,10 +52,14 @@ public class Systems {
         add(new Friends());
         add(new Accounts());
         add(new Waypoints());
+        add(new AvoidanceManager());
+        add(new ThreatManager());
         add(new Profiles());
         add(new Proxies());
         add(new Hud());
         add(new AutoCraftMemory());
+        add(new meteordevelopment.meteorclient.systems.farm.FarmManager());
+        add(new meteordevelopment.meteorclient.systems.storage.StorageManager());
 
         MeteorClient.EVENT_BUS.subscribe(Systems.class);
     }

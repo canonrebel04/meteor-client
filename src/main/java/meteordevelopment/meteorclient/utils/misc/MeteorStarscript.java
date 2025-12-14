@@ -5,12 +5,11 @@
 
 package meteordevelopment.meteorclient.utils.misc;
 
-import baritone.api.BaritoneAPI;
-import baritone.api.pathing.goals.Goal;
-import baritone.api.process.IBaritoneProcess;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.mixin.ClientPlayerInteractionManagerAccessor;
 import meteordevelopment.meteorclient.mixin.MinecraftClientAccessor;
+
+import baritone.api.utils.BetterBlockPos;
 import meteordevelopment.meteorclient.pathing.BaritoneUtils;
 import meteordevelopment.meteorclient.pathing.PathManagers;
 import meteordevelopment.meteorclient.systems.config.Config;
@@ -81,30 +80,35 @@ public class MeteorStarscript {
         ss.set("mc_version", SharedConstants.getGameVersion().name());
         ss.set("fps", () -> Value.number(MinecraftClientAccessor.meteor$getFps()));
         ss.set("ping", MeteorStarscript::ping);
-        ss.set("time", () -> Value.string(LocalTime.now().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))));
+        ss.set("time",
+                () -> Value.string(LocalTime.now().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))));
         ss.set("cps", () -> Value.number(CPSUtils.getCpsAverage()));
 
         // Meteor
         ss.set("meteor", new ValueMap()
-            .set("name", MeteorClient.NAME)
-            .set("version", MeteorClient.VERSION != null ? (MeteorClient.BUILD_NUMBER.isEmpty() ? MeteorClient.VERSION.toString() : MeteorClient.VERSION + " " + MeteorClient.BUILD_NUMBER) : "")
-            .set("modules", () -> Value.number(Modules.get().getAll().size()))
-            .set("active_modules", () -> Value.number(Modules.get().getActive().size()))
-            .set("is_module_active", MeteorStarscript::isModuleActive)
-            .set("get_module_info", MeteorStarscript::getModuleInfo)
-            .set("get_module_setting", MeteorStarscript::getModuleSetting)
-            .set("prefix", MeteorStarscript::getMeteorPrefix)
-        );
+                .set("name", MeteorClient.NAME)
+                .set("version",
+                        MeteorClient.VERSION != null
+                                ? (MeteorClient.BUILD_NUMBER.isEmpty() ? MeteorClient.VERSION.toString()
+                                        : MeteorClient.VERSION + " " + MeteorClient.BUILD_NUMBER)
+                                : "")
+                .set("modules", () -> Value.number(Modules.get().getAll().size()))
+                .set("active_modules", () -> Value.number(Modules.get().getActive().size()))
+                .set("is_module_active", MeteorStarscript::isModuleActive)
+                .set("get_module_info", MeteorStarscript::getModuleInfo)
+                .set("get_module_setting", MeteorStarscript::getModuleSetting)
+                .set("prefix", MeteorStarscript::getMeteorPrefix));
 
         // Baritone
         if (BaritoneUtils.IS_AVAILABLE) {
             ss.set("baritone", new ValueMap()
-                .set("is_pathing", () -> Value.bool(BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().isPathing()))
-                .set("distance_to_goal", MeteorStarscript::baritoneDistanceToGoal)
-                .set("process", MeteorStarscript::baritoneProcess)
-                .set("process_name", MeteorStarscript::baritoneProcessName)
-                .set("eta", MeteorStarscript::baritoneETA)
-            );
+                    .set("is_pathing",
+                            () -> Value.bool(BaritoneUtils
+                                    .isPathing(BaritoneUtils.getPathingBehavior(BaritoneUtils.getPrimaryBaritone()))))
+                    .set("distance_to_goal", MeteorStarscript::baritoneDistanceToGoal)
+                    .set("process", MeteorStarscript::baritoneProcess)
+                    .set("process_name", MeteorStarscript::baritoneProcessName)
+                    .set("eta", MeteorStarscript::baritoneETA));
         }
 
         // Camera
@@ -122,84 +126,87 @@ public class MeteorStarscript {
                 .set("z", () -> oppositeZ(true))
             )
 
-            .set("yaw", () -> yaw(true))
-            .set("pitch", () -> pitch(true))
-            .set("direction", () -> direction(true))
-        );
+                .set("yaw", () -> yaw(true))
+                .set("pitch", () -> pitch(true))
+                .set("direction", () -> direction(true)));
 
         // Player
         ss.set("player", new ValueMap()
-            .set("_toString", () -> Value.string(mc.getSession().getUsername()))
-            .set("health", () -> Value.number(mc.player != null ? mc.player.getHealth() : 0))
-            .set("absorption", () -> Value.number(mc.player != null ? mc.player.getAbsorptionAmount() : 0))
-            .set("hunger", () -> Value.number(mc.player != null ? mc.player.getHungerManager().getFoodLevel() : 0))
-            .set("saturation", () -> Value.number(mc.player != null ? mc.player.getHungerManager().getSaturationLevel() : 0))
+                .set("_toString", () -> Value.string(mc.getSession().getUsername()))
+                .set("health", () -> Value.number(mc.player != null ? mc.player.getHealth() : 0))
+                .set("absorption", () -> Value.number(mc.player != null ? mc.player.getAbsorptionAmount() : 0))
+                .set("hunger", () -> Value.number(mc.player != null ? mc.player.getHungerManager().getFoodLevel() : 0))
+                .set("saturation",
+                        () -> Value.number(mc.player != null ? mc.player.getHungerManager().getSaturationLevel() : 0))
 
-            .set("speed", () -> Value.number(Utils.getPlayerSpeed().horizontalLength()))
-            .set("speed_all", new ValueMap()
-                .set("_toString", () -> Value.string(mc.player != null ? Utils.getPlayerSpeed().toString() : ""))
-                .set("x", () -> Value.number(mc.player != null ? Utils.getPlayerSpeed().x : 0))
-                .set("y", () -> Value.number(mc.player != null ? Utils.getPlayerSpeed().y : 0))
-                .set("z", () -> Value.number(mc.player != null ? Utils.getPlayerSpeed().z : 0))
-            )
+                .set("speed", () -> Value.number(Utils.getPlayerSpeed().horizontalLength()))
+                .set("speed_all", new ValueMap()
+                        .set("_toString",
+                                () -> Value.string(mc.player != null ? Utils.getPlayerSpeed().toString() : ""))
+                        .set("x", () -> Value.number(mc.player != null ? Utils.getPlayerSpeed().x : 0))
+                        .set("y", () -> Value.number(mc.player != null ? Utils.getPlayerSpeed().y : 0))
+                        .set("z", () -> Value.number(mc.player != null ? Utils.getPlayerSpeed().z : 0)))
 
-            .set("breaking_progress", () -> Value.number(mc.interactionManager != null ? ((ClientPlayerInteractionManagerAccessor) mc.interactionManager).meteor$getBreakingProgress() : 0))
-            .set("biome", MeteorStarscript::biome)
+                .set("breaking_progress",
+                        () -> Value.number(mc.interactionManager != null
+                                ? ((ClientPlayerInteractionManagerAccessor) mc.interactionManager)
+                                        .meteor$getBreakingProgress()
+                                : 0))
+                .set("biome", MeteorStarscript::biome)
 
-            .set("dimension", () -> Value.string(PlayerUtils.getDimension().name()))
-            .set("opposite_dimension", () -> Value.string(PlayerUtils.getDimension().opposite().name()))
+                .set("dimension", () -> Value.string(PlayerUtils.getDimension().name()))
+                .set("opposite_dimension", () -> Value.string(PlayerUtils.getDimension().opposite().name()))
 
-            .set("gamemode", () -> PlayerUtils.getGameMode() != null ? Value.string(StringUtils.capitalize(PlayerUtils.getGameMode().getId())) : Value.null_())
+                .set("gamemode",
+                        () -> PlayerUtils.getGameMode() != null
+                                ? Value.string(StringUtils.capitalize(PlayerUtils.getGameMode().getId()))
+                                : Value.null_())
 
-            .set("pos", new ValueMap()
-                .set("_toString", () -> posString(false, false))
-                .set("x", () -> Value.number(mc.player != null ? mc.player.getX() : 0))
-                .set("y", () -> Value.number(mc.player != null ? mc.player.getY() : 0))
-                .set("z", () -> Value.number(mc.player != null ? mc.player.getZ() : 0))
-            )
-            .set("opposite_dim_pos", new ValueMap()
-                .set("_toString", () -> posString(true, false))
-                .set("x", () -> oppositeX(false))
-                .set("y", () -> Value.number(mc.player != null ? mc.player.getY() : 0))
-                .set("z", () -> oppositeZ(false))
-            )
+                .set("pos", new ValueMap()
+                        .set("_toString", () -> posString(false, false))
+                        .set("x", () -> Value.number(mc.player != null ? mc.player.getX() : 0))
+                        .set("y", () -> Value.number(mc.player != null ? mc.player.getY() : 0))
+                        .set("z", () -> Value.number(mc.player != null ? mc.player.getZ() : 0)))
+                .set("opposite_dim_pos", new ValueMap()
+                        .set("_toString", () -> posString(true, false))
+                        .set("x", () -> oppositeX(false))
+                        .set("y", () -> Value.number(mc.player != null ? mc.player.getY() : 0))
+                        .set("z", () -> oppositeZ(false)))
 
-            .set("yaw", () -> yaw(false))
-            .set("pitch", () -> pitch(false))
-            .set("direction", () -> direction(false))
+                .set("yaw", () -> yaw(false))
+                .set("pitch", () -> pitch(false))
+                .set("direction", () -> direction(false))
 
-            .set("hand", () -> mc.player != null ? wrap(mc.player.getMainHandStack()) : Value.null_())
-            .set("offhand", () -> mc.player != null ? wrap(mc.player.getOffHandStack()) : Value.null_())
-            .set("hand_or_offhand", MeteorStarscript::handOrOffhand)
-            .set("get_item", MeteorStarscript::getItem)
-            .set("count_items", MeteorStarscript::countItems)
+                .set("hand", () -> mc.player != null ? wrap(mc.player.getMainHandStack()) : Value.null_())
+                .set("offhand", () -> mc.player != null ? wrap(mc.player.getOffHandStack()) : Value.null_())
+                .set("hand_or_offhand", MeteorStarscript::handOrOffhand)
+                .set("get_item", MeteorStarscript::getItem)
+                .set("count_items", MeteorStarscript::countItems)
 
-            .set("xp", new ValueMap()
-                .set("level", () -> Value.number(mc.player != null ? mc.player.experienceLevel : 0))
-                .set("progress", () -> Value.number(mc.player != null ? mc.player.experienceProgress : 0))
-                .set("total", () -> Value.number(mc.player != null ? mc.player.totalExperience : 0))
-            )
+                .set("xp", new ValueMap()
+                        .set("level", () -> Value.number(mc.player != null ? mc.player.experienceLevel : 0))
+                        .set("progress", () -> Value.number(mc.player != null ? mc.player.experienceProgress : 0))
+                        .set("total", () -> Value.number(mc.player != null ? mc.player.totalExperience : 0)))
 
-            .set("has_potion_effect", MeteorStarscript::hasPotionEffect)
-            .set("get_potion_effect", MeteorStarscript::getPotionEffect)
+                .set("has_potion_effect", MeteorStarscript::hasPotionEffect)
+                .set("get_potion_effect", MeteorStarscript::getPotionEffect)
 
-            .set("get_stat", MeteorStarscript::getStat)
-        );
+                .set("get_stat", MeteorStarscript::getStat));
 
         // Crosshair target
         ss.set("crosshair_target", new ValueMap()
-            .set("type", MeteorStarscript::crosshairType)
-            .set("value", MeteorStarscript::crosshairValue)
-        );
+                .set("type", MeteorStarscript::crosshairType)
+                .set("value", MeteorStarscript::crosshairValue));
 
         // Server
         ss.set("server", new ValueMap()
-            .set("_toString", () -> Value.string(Utils.getWorldName()))
-            .set("tps", () -> Value.number(TickRate.INSTANCE.getTickRate()))
-            .set("time", () -> Value.string(Utils.getWorldTime()))
-            .set("player_count", () -> Value.number(mc.getNetworkHandler() != null ? mc.getNetworkHandler().getPlayerList().size() : 0))
-            .set("difficulty", () -> Value.string(mc.world != null ? mc.world.getDifficulty().getName() : ""))
-        );
+                .set("_toString", () -> Value.string(Utils.getWorldName()))
+                .set("tps", () -> Value.number(TickRate.INSTANCE.getTickRate()))
+                .set("time", () -> Value.string(Utils.getWorldTime()))
+                .set("player_count",
+                        () -> Value.number(
+                                mc.getNetworkHandler() != null ? mc.getNetworkHandler().getPlayerList().size() : 0))
+                .set("difficulty", () -> Value.string(mc.world != null ? mc.world.getDifficulty().getName() : "")));
     }
 
     // Helpers
@@ -208,7 +215,8 @@ public class MeteorStarscript {
         Parser.Result result = Parser.parse(source);
 
         if (result.hasErrors()) {
-            for (Error error : result.errors) printChatError(error);
+            for (Error error : result.errors)
+                printChatError(error);
             return null;
         }
 
@@ -218,12 +226,12 @@ public class MeteorStarscript {
     public static Section runSection(Script script, StringBuilder sb) {
         try {
             return ss.run(script, sb);
-        }
-        catch (StarscriptError error) {
+        } catch (StarscriptError error) {
             printChatError(error);
             return null;
         }
     }
+
     public static String run(Script script, StringBuilder sb) {
         Section section = runSection(script, sb);
         return section != null ? section.toString() : null;
@@ -243,12 +251,17 @@ public class MeteorStarscript {
         String caller = getCallerName();
 
         if (caller != null) {
-            if (i != -1) ChatUtils.errorPrefix("Starscript", "%d, %d '%c': %s (from %s)", i, error.character, error.ch, error.message, caller);
-            else ChatUtils.errorPrefix("Starscript", "%d '%c': %s (from %s)", error.character, error.ch, error.message, caller);
-        }
-        else {
-            if (i != -1) ChatUtils.errorPrefix("Starscript", "%d, %d '%c': %s", i, error.character, error.ch, error.message);
-            else ChatUtils.errorPrefix("Starscript", "%d '%c': %s", error.character, error.ch, error.message);
+            if (i != -1)
+                ChatUtils.errorPrefix("Starscript", "%d, %d '%c': %s (from %s)", i, error.character, error.ch,
+                        error.message, caller);
+            else
+                ChatUtils.errorPrefix("Starscript", "%d '%c': %s (from %s)", error.character, error.ch, error.message,
+                        caller);
+        } else {
+            if (i != -1)
+                ChatUtils.errorPrefix("Starscript", "%d, %d '%c': %s", i, error.character, error.ch, error.message);
+            else
+                ChatUtils.errorPrefix("Starscript", "%d '%c': %s", error.character, error.ch, error.message);
         }
     }
 
@@ -259,19 +272,24 @@ public class MeteorStarscript {
     public static void printChatError(StarscriptError e) {
         String caller = getCallerName();
 
-        if (caller != null) ChatUtils.errorPrefix("Starscript", "%s (from %s)", e.getMessage(), caller);
-        else ChatUtils.errorPrefix("Starscript", "%s", e.getMessage());
+        if (caller != null)
+            ChatUtils.errorPrefix("Starscript", "%s (from %s)", e.getMessage(), caller);
+        else
+            ChatUtils.errorPrefix("Starscript", "%s", e.getMessage());
     }
 
     private static String getCallerName() {
         StackTraceElement[] elements = Thread.currentThread().getStackTrace();
-        if (elements.length == 0) return null;
+        if (elements.length == 0)
+            return null;
 
         for (int i = 1; i < elements.length; i++) {
             String name = elements[i].getClassName();
 
-            if (name.startsWith(Starscript.class.getPackageName())) continue;
-            if (name.equals(MeteorStarscript.class.getName())) continue;
+            if (name.startsWith(Starscript.class.getPackageName()))
+                continue;
+            if (name.equals(MeteorStarscript.class.getName()))
+                continue;
 
             return name.substring(name.lastIndexOf('.') + 1);
         }
@@ -284,36 +302,45 @@ public class MeteorStarscript {
     private static long lastRequestedStatsTime = 0;
 
     private static Value hasPotionEffect(Starscript ss, int argCount) {
-        if (argCount < 1) ss.error("player.has_potion_effect() requires 1 argument, got %d.", argCount);
-        if (mc.player == null) return Value.bool(false);
+        if (argCount < 1)
+            ss.error("player.has_potion_effect() requires 1 argument, got %d.", argCount);
+        if (mc.player == null)
+            return Value.bool(false);
 
         Identifier name = popIdentifier(ss, "First argument to player.has_potion_effect() needs to a string.");
 
         Optional<RegistryEntry.Reference<StatusEffect>> effect = Registries.STATUS_EFFECT.getEntry(name);
-        if (effect.isEmpty()) return Value.bool(false);
+        if (effect.isEmpty())
+            return Value.bool(false);
 
         StatusEffectInstance effectInstance = mc.player.getStatusEffect(effect.get());
         return Value.bool(effectInstance != null);
     }
 
     private static Value getPotionEffect(Starscript ss, int argCount) {
-        if (argCount < 1) ss.error("player.get_potion_effect() requires 1 argument, got %d.", argCount);
-        if (mc.player == null) return Value.null_();
+        if (argCount < 1)
+            ss.error("player.get_potion_effect() requires 1 argument, got %d.", argCount);
+        if (mc.player == null)
+            return Value.null_();
 
         Identifier name = popIdentifier(ss, "First argument to player.get_potion_effect() needs to a string.");
 
         Optional<RegistryEntry.Reference<StatusEffect>> effect = Registries.STATUS_EFFECT.getEntry(name);
-        if (effect.isEmpty()) return Value.null_();
+        if (effect.isEmpty())
+            return Value.null_();
 
         StatusEffectInstance effectInstance = mc.player.getStatusEffect(effect.get());
-        if (effectInstance == null) return Value.null_();
+        if (effectInstance == null)
+            return Value.null_();
 
         return wrap(effectInstance);
     }
 
     private static Value getStat(Starscript ss, int argCount) {
-        if (argCount < 1) ss.error("player.get_stat() requires 1 argument, got %d.", argCount);
-        if (mc.player == null) return Value.number(0);
+        if (argCount < 1)
+            ss.error("player.get_stat() requires 1 argument, got %d.", argCount);
+        if (mc.player == null)
+            return Value.number(0);
 
         long time = System.currentTimeMillis();
         if ((time - lastRequestedStatsTime) / 1000.0 >= 1 && mc.getNetworkHandler() != null) {
@@ -321,8 +348,10 @@ public class MeteorStarscript {
             lastRequestedStatsTime = time;
         }
 
-        String type = argCount > 1 ? ss.popString("First argument to player.get_stat() needs to be a string.") : "custom";
-        Identifier name = popIdentifier(ss, (argCount > 1 ? "Second" : "First") + " argument to player.get_stat() needs to be a string.");
+        String type = argCount > 1 ? ss.popString("First argument to player.get_stat() needs to be a string.")
+                : "custom";
+        Identifier name = popIdentifier(ss,
+                (argCount > 1 ? "Second" : "First") + " argument to player.get_stat() needs to be a string.");
 
         Stat<?> stat = switch (type) {
             case "mined" -> Stats.MINED.getOrCreateStat(Registries.BLOCK.get(name));
@@ -344,9 +373,11 @@ public class MeteorStarscript {
     }
 
     private static Value getModuleInfo(Starscript ss, int argCount) {
-        if (argCount != 1) ss.error("meteor.get_module_info() requires 1 argument, got %d.", argCount);
+        if (argCount != 1)
+            ss.error("meteor.get_module_info() requires 1 argument, got %d.", argCount);
 
-        Module module = Modules.get().get(ss.popString("First argument to meteor.get_module_info() needs to be a string."));
+        Module module = Modules.get()
+                .get(ss.popString("First argument to meteor.get_module_info() needs to be a string."));
         if (module != null && module.isActive()) {
             String info = module.getInfoString();
             return Value.string(info == null ? "" : info);
@@ -356,7 +387,8 @@ public class MeteorStarscript {
     }
 
     private static Value getModuleSetting(Starscript ss, int argCount) {
-        if (argCount != 2) ss.error("meteor.get_module_setting() requires 2 arguments, got %d.", argCount);
+        if (argCount != 2)
+            ss.error("meteor.get_module_setting() requires 2 arguments, got %d.", argCount);
 
         var settingName = ss.popString("Second argument to meteor.get_module_setting() needs to be a string.");
         var moduleName = ss.popString("First argument to meteor.get_module_setting() needs to be a string.");
@@ -379,57 +411,75 @@ public class MeteorStarscript {
     }
 
     private static Value isModuleActive(Starscript ss, int argCount) {
-        if (argCount != 1) ss.error("meteor.is_module_active() requires 1 argument, got %d.", argCount);
+        if (argCount != 1)
+            ss.error("meteor.is_module_active() requires 1 argument, got %d.", argCount);
 
-        Module module = Modules.get().get(ss.popString("First argument to meteor.is_module_active() needs to be a string."));
+        Module module = Modules.get()
+                .get(ss.popString("First argument to meteor.is_module_active() needs to be a string."));
         return Value.bool(module != null && module.isActive());
     }
 
     private static Value getItem(Starscript ss, int argCount) {
-        if (argCount != 1) ss.error("player.get_item() requires 1 argument, got %d.", argCount);
+        if (argCount != 1)
+            ss.error("player.get_item() requires 1 argument, got %d.", argCount);
 
         int i = (int) ss.popNumber("First argument to player.get_item() needs to be a number.");
-        if (i < 0) ss.error("First argument to player.get_item() needs to be a non-negative integer.", i);
+        if (i < 0)
+            ss.error("First argument to player.get_item() needs to be a non-negative integer.", i);
         return mc.player != null ? wrap(mc.player.getInventory().getStack(i)) : Value.null_();
     }
 
     private static Value countItems(Starscript ss, int argCount) {
-        if (argCount != 1) ss.error("player.count_items() requires 1 argument, got %d.", argCount);
+        if (argCount != 1)
+            ss.error("player.count_items() requires 1 argument, got %d.", argCount);
 
         String idRaw = ss.popString("First argument to player.count_items() needs to be a string.");
         Identifier id = Identifier.tryParse(idRaw);
-        if (id == null) return Value.number(0);
+        if (id == null)
+            return Value.number(0);
 
         Item item = Registries.ITEM.get(id);
-        if (item == Items.AIR || mc.player == null) return Value.number(0);
+        if (item == Items.AIR || mc.player == null)
+            return Value.number(0);
 
         int count = 0;
         for (int i = 0; i < mc.player.getInventory().size(); i++) {
             ItemStack itemStack = mc.player.getInventory().getStack(i);
-            if (itemStack.getItem() == item) count += itemStack.getCount();
+            if (itemStack.getItem() == item)
+                count += itemStack.getCount();
         }
 
         return Value.number(count);
     }
 
     private static Value getMeteorPrefix() {
-        if (Config.get() == null) return Value.null_();
+        if (Config.get() == null)
+            return Value.null_();
         return Value.string(Config.get().prefix.get());
     }
 
     // Other
 
     private static Value baritoneProcess() {
-        Optional<IBaritoneProcess> process = BaritoneAPI.getProvider().getPrimaryBaritone().getPathingControlManager().mostRecentInControl();
-        return Value.string(process.isEmpty() ? "" : process.get().displayName0());
+        Object baritone = BaritoneUtils.getPrimaryBaritone();
+        if (baritone == null)
+            return Value.null_();
+        Optional<Object> process = BaritoneUtils
+                .getMostRecentInControl(BaritoneUtils.getPathingControlManager(baritone));
+        return Value.string(process.map(p -> BaritoneUtils.getProcessDisplayName0(p)).orElse(""));
     }
 
     private static Value baritoneProcessName() {
-        Optional<IBaritoneProcess> process = BaritoneAPI.getProvider().getPrimaryBaritone().getPathingControlManager().mostRecentInControl();
-        if (process.isEmpty()) return Value.string("");
-
+        Object baritone = BaritoneUtils.getPrimaryBaritone();
+        if (baritone == null)
+            return Value.null_();
+        Optional<Object> process = BaritoneUtils
+                .getMostRecentInControl(BaritoneUtils.getPathingControlManager(baritone));
+        if (process.isEmpty())
+            return Value.string("");
         String className = process.get().getClass().getSimpleName();
-        if (className.endsWith("Process")) className = className.substring(0, className.length() - 7);
+        if (className.endsWith("Process"))
+            className = className.substring(0, className.length() - 7);
 
         SB.append(className);
         int i = 0;
@@ -449,8 +499,10 @@ public class MeteorStarscript {
 
     // Returns the ETA in seconds
     private static Value baritoneETA() {
-        if (mc.player == null) return Value.number(0);
-        Optional<Double> ticksTillGoal = BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().estimatedTicksToGoal();
+        if (mc.player == null)
+            return Value.number(0);
+        Optional<Double> ticksTillGoal = BaritoneUtils
+                .estimatedTicksToGoal(BaritoneUtils.getPathingBehavior(BaritoneUtils.getPrimaryBaritone()));
         return ticksTillGoal.map(aDouble -> Value.number(aDouble / 20)).orElseGet(() -> Value.number(0));
     }
 
@@ -458,8 +510,10 @@ public class MeteorStarscript {
         double x = camera ? mc.gameRenderer.getCamera().getCameraPos().x : (mc.player != null ? mc.player.getX() : 0);
         Dimension dimension = PlayerUtils.getDimension();
 
-        if (dimension == Dimension.Overworld) x /= 8;
-        else if (dimension == Dimension.Nether) x *= 8;
+        if (dimension == Dimension.Overworld)
+            x /= 8;
+        else if (dimension == Dimension.Nether)
+            x *= 8;
 
         return Value.number(x);
     }
@@ -468,76 +522,99 @@ public class MeteorStarscript {
         double z = camera ? mc.gameRenderer.getCamera().getCameraPos().z : (mc.player != null ? mc.player.getZ() : 0);
         Dimension dimension = PlayerUtils.getDimension();
 
-        if (dimension == Dimension.Overworld) z /= 8;
-        else if (dimension == Dimension.Nether) z *= 8;
+        if (dimension == Dimension.Overworld)
+            z /= 8;
+        else if (dimension == Dimension.Nether)
+            z *= 8;
 
         return Value.number(z);
     }
 
     private static Value yaw(boolean camera) {
         float yaw;
-        if (camera) yaw = mc.gameRenderer.getCamera().getYaw();
-        else yaw = mc.player != null ? mc.player.getYaw() : 0;
+        if (camera)
+            yaw = mc.gameRenderer.getCamera().getYaw();
+        else
+            yaw = mc.player != null ? mc.player.getYaw() : 0;
         yaw %= 360;
 
-        if (yaw < 0) yaw += 360;
-        if (yaw > 180) yaw -= 360;
+        if (yaw < 0)
+            yaw += 360;
+        if (yaw > 180)
+            yaw -= 360;
 
         return Value.number(yaw);
     }
 
     private static Value pitch(boolean camera) {
         float pitch;
-        if (camera) pitch = mc.gameRenderer.getCamera().getPitch();
-        else pitch = mc.player != null ? mc.player.getPitch() : 0;
+        if (camera)
+            pitch = mc.gameRenderer.getCamera().getPitch();
+        else
+            pitch = mc.player != null ? mc.player.getPitch() : 0;
         pitch %= 360;
 
-        if (pitch < 0) pitch += 360;
-        if (pitch > 180) pitch -= 360;
+        if (pitch < 0)
+            pitch += 360;
+        if (pitch > 180)
+            pitch -= 360;
 
         return Value.number(pitch);
     }
 
     private static Value direction(boolean camera) {
         float yaw;
-        if (camera) yaw = mc.gameRenderer.getCamera().getYaw();
-        else yaw = mc.player != null ? mc.player.getYaw() : 0;
+        if (camera)
+            yaw = mc.gameRenderer.getCamera().getYaw();
+        else
+            yaw = mc.player != null ? mc.player.getYaw() : 0;
 
         return wrap(HorizontalDirection.get(yaw));
     }
 
     private static Value biome() {
-        if (mc.player == null || mc.world == null) return Value.string("");
+        if (mc.player == null || mc.world == null)
+            return Value.string("");
 
         BP.set(mc.player.getX(), mc.player.getY(), mc.player.getZ());
         return mc.world.getRegistryManager().getOptional(RegistryKeys.BIOME)
-            .map(biomeRegistry -> {
-                Identifier id = biomeRegistry.getId(mc.world.getBiome(BP).value());
-                if (id == null) return Value.string("Unknown");
-                return Value.string(Arrays.stream(id.getPath().split("_")).map(StringUtils::capitalize).collect(Collectors.joining(" ")));
-            })
-            .orElse(Value.string("Unknown"));
+                .map(biomeRegistry -> {
+                    Identifier id = biomeRegistry.getId(mc.world.getBiome(BP).value());
+                    if (id == null)
+                        return Value.string("Unknown");
+                    return Value.string(Arrays.stream(id.getPath().split("_")).map(StringUtils::capitalize)
+                            .collect(Collectors.joining(" ")));
+                })
+                .orElse(Value.string("Unknown"));
     }
 
     private static Value handOrOffhand() {
-        if (mc.player == null) return Value.null_();
+        if (mc.player == null)
+            return Value.null_();
 
         ItemStack itemStack = mc.player.getMainHandStack();
-        if (itemStack.isEmpty()) itemStack = mc.player.getOffHandStack();
+        if (itemStack.isEmpty())
+            itemStack = mc.player.getOffHandStack();
 
         return itemStack != null ? wrap(itemStack) : Value.null_();
     }
 
     private static Value ping() {
-        if (mc.getNetworkHandler() == null || mc.player == null) return Value.number(0);
+        if (mc.getNetworkHandler() == null || mc.player == null)
+            return Value.number(0);
 
         PlayerListEntry playerListEntry = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
         return Value.number(playerListEntry != null ? playerListEntry.getLatency() : 0);
     }
 
     private static Value baritoneDistanceToGoal() {
-        Goal goal = BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().getGoal();
-        return Value.number((goal != null && mc.player != null) ? goal.heuristic(mc.player.getBlockPos()) : 0);
+        Object baritone = BaritoneUtils.getPrimaryBaritone();
+        if (baritone == null)
+            return Value.number(0);
+        Object goal = BaritoneUtils.getGoal(BaritoneUtils.getCustomGoalProcess(baritone)); // Returns Object
+        return Value.number(
+                (goal != null && mc.player != null) ? BaritoneUtils.getGoalHeuristic(goal, mc.player.getBlockPos())
+                        : 0);
     }
 
     private static Value posString(boolean opposite, boolean camera) {
@@ -554,8 +631,7 @@ public class MeteorStarscript {
             if (dimension == Dimension.Overworld) {
                 x /= 8;
                 z /= 8;
-            }
-            else if (dimension == Dimension.Nether) {
+            } else if (dimension == Dimension.Nether) {
                 x *= 8;
                 z *= 8;
             }
@@ -569,7 +645,8 @@ public class MeteorStarscript {
     }
 
     private static Value crosshairType() {
-        if (mc.crosshairTarget == null) return Value.string("miss");
+        if (mc.crosshairTarget == null)
+            return Value.string("miss");
 
         return Value.string(switch (mc.crosshairTarget.getType()) {
             case MISS -> "miss";
@@ -579,10 +656,13 @@ public class MeteorStarscript {
     }
 
     private static Value crosshairValue() {
-        if (mc.world == null || mc.crosshairTarget == null) return Value.null_();
+        if (mc.world == null || mc.crosshairTarget == null)
+            return Value.null_();
 
-        if (mc.crosshairTarget.getType() == HitResult.Type.MISS) return Value.string("");
-        if (mc.crosshairTarget instanceof BlockHitResult hit) return wrap(hit.getBlockPos(), mc.world.getBlockState(hit.getBlockPos()));
+        if (mc.crosshairTarget.getType() == HitResult.Type.MISS)
+            return Value.string("");
+        if (mc.crosshairTarget instanceof BlockHitResult hit)
+            return wrap(new BetterBlockPos(hit.getBlockPos()), mc.world.getBlockState(hit.getBlockPos()));
         return wrap(((EntityHitResult) mc.crosshairTarget).getEntity());
     }
 
@@ -591,8 +671,7 @@ public class MeteorStarscript {
     public static Identifier popIdentifier(Starscript ss, String errorMessage) {
         try {
             return Identifier.of(ss.popString(errorMessage));
-        }
-        catch (InvalidIdentifierException e) {
+        } catch (InvalidIdentifierException e) {
             ss.error(e.getMessage());
             return null;
         }
@@ -604,58 +683,54 @@ public class MeteorStarscript {
         String name = itemStack.isEmpty() ? "" : Names.get(itemStack.getItem());
 
         int durability = 0;
-        if (!itemStack.isEmpty() && itemStack.isDamageable()) durability = itemStack.getMaxDamage() - itemStack.getDamage();
+        if (!itemStack.isEmpty() && itemStack.isDamageable())
+            durability = itemStack.getMaxDamage() - itemStack.getDamage();
 
         return Value.map(new ValueMap()
-            .set("_toString", Value.string(itemStack.getCount() <= 1 ? name : String.format("%s %dx", name, itemStack.getCount())))
-            .set("name", Value.string(name))
-            .set("id", Value.string(Registries.ITEM.getId(itemStack.getItem()).toString()))
-            .set("count", Value.number(itemStack.getCount()))
-            .set("durability", Value.number(durability))
-            .set("max_durability", Value.number(itemStack.getMaxDamage()))
-        );
+                .set("_toString",
+                        Value.string(
+                                itemStack.getCount() <= 1 ? name : String.format("%s %dx", name, itemStack.getCount())))
+                .set("name", Value.string(name))
+                .set("id", Value.string(Registries.ITEM.getId(itemStack.getItem()).toString()))
+                .set("count", Value.number(itemStack.getCount()))
+                .set("durability", Value.number(durability))
+                .set("max_durability", Value.number(itemStack.getMaxDamage())));
     }
 
     public static Value wrap(BlockPos blockPos, BlockState blockState) {
         return Value.map(new ValueMap()
-            .set("_toString", Value.string(Names.get(blockState.getBlock())))
-            .set("id", Value.string(Registries.BLOCK.getId(blockState.getBlock()).toString()))
-            .set("pos", Value.map(new ValueMap()
-                .set("_toString", posString(blockPos.getX(), blockPos.getY(), blockPos.getZ()))
-                .set("x", Value.number(blockPos.getX()))
-                .set("y", Value.number(blockPos.getY()))
-                .set("z", Value.number(blockPos.getZ()))
-            ))
-        );
+                .set("_toString", Value.string(Names.get(blockState.getBlock())))
+                .set("id", Value.string(Registries.BLOCK.getId(blockState.getBlock()).toString()))
+                .set("pos", Value.map(new ValueMap()
+                        .set("_toString", posString(blockPos.getX(), blockPos.getY(), blockPos.getZ()))
+                        .set("x", Value.number(blockPos.getX()))
+                        .set("y", Value.number(blockPos.getY()))
+                        .set("z", Value.number(blockPos.getZ())))));
     }
 
     public static Value wrap(Entity entity) {
         return Value.map(new ValueMap()
-            .set("_toString", Value.string(entity.getName().getString()))
-            .set("id", Value.string(Registries.ENTITY_TYPE.getId(entity.getType()).toString()))
-            .set("health", Value.number(entity instanceof LivingEntity e ? e.getHealth(): 0))
-            .set("absorption", Value.number(entity instanceof LivingEntity e ? e.getAbsorptionAmount() : 0))
-            .set("pos", Value.map(new ValueMap()
-                .set("_toString", posString(entity.getX(), entity.getY(), entity.getZ()))
-                .set("x", Value.number(entity.getX()))
-                .set("y", Value.number(entity.getY()))
-                .set("z", Value.number(entity.getZ()))
-            ))
-        );
+                .set("_toString", Value.string(entity.getName().getString()))
+                .set("id", Value.string(Registries.ENTITY_TYPE.getId(entity.getType()).toString()))
+                .set("health", Value.number(entity instanceof LivingEntity e ? e.getHealth() : 0))
+                .set("absorption", Value.number(entity instanceof LivingEntity e ? e.getAbsorptionAmount() : 0))
+                .set("pos", Value.map(new ValueMap()
+                        .set("_toString", posString(entity.getX(), entity.getY(), entity.getZ()))
+                        .set("x", Value.number(entity.getX()))
+                        .set("y", Value.number(entity.getY()))
+                        .set("z", Value.number(entity.getZ())))));
     }
 
     public static Value wrap(HorizontalDirection dir) {
         return Value.map(new ValueMap()
-            .set("_toString", Value.string(dir.name + " " + dir.axis))
-            .set("name", Value.string(dir.name))
-            .set("axis", Value.string(dir.axis))
-        );
+                .set("_toString", Value.string(dir.name + " " + dir.axis))
+                .set("name", Value.string(dir.name))
+                .set("axis", Value.string(dir.axis)));
     }
 
     public static Value wrap(StatusEffectInstance effectInstance) {
         return Value.map(new ValueMap()
-            .set("duration", effectInstance.getDuration())
-            .set("level", effectInstance.getAmplifier() + 1)
-        );
+                .set("duration", effectInstance.getDuration())
+                .set("level", effectInstance.getAmplifier() + 1));
     }
 }

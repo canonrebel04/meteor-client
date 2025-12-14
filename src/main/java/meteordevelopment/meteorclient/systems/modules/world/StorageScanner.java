@@ -34,63 +34,56 @@ public class StorageScanner extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
 
     private final Setting<Integer> searchRadius = sgGeneral.add(new IntSetting.Builder()
-        .name("search-radius")
-        .description("Radius (in blocks) to look for storage blocks.")
-        .defaultValue(24)
-        .min(4)
-        .sliderRange(4, 128)
-        .build()
-    );
+            .name("search-radius")
+            .description("Radius (in blocks) to look for storage blocks.")
+            .defaultValue(24)
+            .min(4)
+            .sliderRange(4, 128)
+            .build());
 
     private final Setting<Integer> yRange = sgGeneral.add(new IntSetting.Builder()
-        .name("y-range")
-        .description("Vertical range relative to player to sample for storage blocks.")
-        .defaultValue(4)
-        .min(0)
-        .sliderRange(0, 32)
-        .build()
-    );
+            .name("y-range")
+            .description("Vertical range relative to player to sample for storage blocks.")
+            .defaultValue(4)
+            .min(0)
+            .sliderRange(0, 32)
+            .build());
 
     private final Setting<Integer> samplesPerTick = sgGeneral.add(new IntSetting.Builder()
-        .name("samples-per-tick")
-        .description("How many random positions to sample per tick when searching.")
-        .defaultValue(260)
-        .min(1)
-        .sliderRange(1, 4096)
-        .build()
-    );
+            .name("samples-per-tick")
+            .description("How many random positions to sample per tick when searching.")
+            .defaultValue(260)
+            .min(1)
+            .sliderRange(1, 4096)
+            .build());
 
     private final Setting<Integer> interactCooldownTicks = sgGeneral.add(new IntSetting.Builder()
-        .name("interact-cooldown")
-        .description("Minimum ticks between interaction attempts.")
-        .defaultValue(12)
-        .min(0)
-        .sliderRange(0, 200)
-        .build()
-    );
+            .name("interact-cooldown")
+            .description("Minimum ticks between interaction attempts.")
+            .defaultValue(12)
+            .min(0)
+            .sliderRange(0, 200)
+            .build());
 
     private final Setting<Integer> maxContainersPerRun = sgGeneral.add(new IntSetting.Builder()
-        .name("max-containers")
-        .description("Stop after opening this many containers.")
-        .defaultValue(12)
-        .min(1)
-        .sliderRange(1, 100)
-        .build()
-    );
+            .name("max-containers")
+            .description("Stop after opening this many containers.")
+            .defaultValue(12)
+            .min(1)
+            .sliderRange(1, 100)
+            .build());
 
     private final Setting<Boolean> includeBarrels = sgGeneral.add(new BoolSetting.Builder()
-        .name("include-barrels")
-        .description("Treat barrels as storage to scan.")
-        .defaultValue(true)
-        .build()
-    );
+            .name("include-barrels")
+            .description("Treat barrels as storage to scan.")
+            .defaultValue(true)
+            .build());
 
     private final Setting<Boolean> stopOnDisable = sgGeneral.add(new BoolSetting.Builder()
-        .name("stop-on-disable")
-        .description("Stop pathing when this module is disabled.")
-        .defaultValue(true)
-        .build()
-    );
+            .name("stop-on-disable")
+            .description("Stop pathing when this module is disabled.")
+            .defaultValue(true)
+            .build());
 
     private final Random rng = new Random();
     private final BlockPos.Mutable samplePos = new BlockPos.Mutable();
@@ -101,12 +94,14 @@ public class StorageScanner extends Module {
     private int opened;
 
     public StorageScanner() {
-        super(Categories.World, "storage-scanner", "Opens nearby storage blocks and records their inventory into AutoCraft memory.");
+        super(Categories.World, "storage-scanner",
+                "Opens nearby storage blocks and records their inventory into AutoCraft memory.");
     }
 
     @Override
     public void onActivate() {
-        BaritoneUtils.acquireContainerProtection();
+        BaritoneUtils.setSetting("allowInventory",
+                (Boolean) BaritoneUtils.getSettingDefaultValue(BaritoneUtils.getSettings().allowInventory));
         tick = 0;
         lastInteractTick = 0;
         opened = 0;
@@ -115,13 +110,15 @@ public class StorageScanner extends Module {
 
     @Override
     public void onDeactivate() {
-        if (stopOnDisable.get()) PathManagers.get().stop();
+        if (stopOnDisable.get())
+            PathManagers.get().stop();
         BaritoneUtils.releaseContainerProtection();
     }
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (!Utils.canUpdate()) return;
+        if (!Utils.canUpdate())
+            return;
 
         tick++;
 
@@ -136,7 +133,8 @@ public class StorageScanner extends Module {
         }
 
         if (targetPos == Long.MIN_VALUE || !isValidStorage(BlockPos.fromLong(targetPos))) {
-            if (!findNearbyStorage()) return;
+            if (!findNearbyStorage())
+                return;
         }
 
         BlockPos pos = BlockPos.fromLong(targetPos);
@@ -146,7 +144,8 @@ public class StorageScanner extends Module {
 
         if (distSq <= interactRange * interactRange) {
             int cooldown = Math.max(0, interactCooldownTicks.get());
-            if (cooldown > 0 && tick - lastInteractTick < cooldown) return;
+            if (cooldown > 0 && tick - lastInteractTick < cooldown)
+                return;
 
             AutoCraftContext.markNextContainer(pos);
             BlockHitResult hit = new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false);
@@ -160,7 +159,7 @@ public class StorageScanner extends Module {
         }
 
         if (!PathManagers.get().isPathing()) {
-            PathManagers.get().moveTo(pos, false);
+            BaritoneUtils.setSetting("allowInventory", true);
         }
     }
 
@@ -191,8 +190,10 @@ public class StorageScanner extends Module {
             samplePos.set(x, y, z);
 
             BlockState state = mc.world.getBlockState(samplePos);
-            if (!isAllowedStorage(state.getBlock())) continue;
-            if (!state.getFluidState().isEmpty() && state.getFluidState().isIn(FluidTags.LAVA)) continue;
+            if (!isAllowedStorage(state.getBlock()))
+                continue;
+            if (!state.getFluidState().isEmpty() && state.getFluidState().isIn(FluidTags.LAVA))
+                continue;
 
             double distSq = mc.player.squaredDistanceTo(Vec3d.ofCenter(samplePos));
             if (distSq < bestDistSq) {
@@ -210,8 +211,10 @@ public class StorageScanner extends Module {
     }
 
     private boolean isAllowedStorage(Block block) {
-        if (block == Blocks.CHEST || block == Blocks.TRAPPED_CHEST) return true;
-        if (block == Blocks.BARREL) return includeBarrels.get();
+        if (block == Blocks.CHEST || block == Blocks.TRAPPED_CHEST)
+            return true;
+        if (block == Blocks.BARREL)
+            return includeBarrels.get();
         return false;
     }
 
@@ -223,13 +226,16 @@ public class StorageScanner extends Module {
     private void startPendingAutoCraftIfAny() {
         try {
             var pending = AutoCraftContext.consumePendingAutoCraft();
-            if (pending == null) return;
+            if (pending == null)
+                return;
 
             Item target = pending.resolveItem();
-            if (target == null) return;
+            if (target == null)
+                return;
 
             var mod = Modules.get().get(AutoCraft.class);
-            if (mod == null) return;
+            if (mod == null)
+                return;
 
             mod.setTarget(target, pending.count());
             if (!mod.isActive()) {
