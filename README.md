@@ -1,60 +1,156 @@
+# Meteor Client with Enhanced Baritone Integration
 
-<p align="center">
-<img src="https://meteorclient.com/icon.png" alt="meteor-client-logo" width="15%"/>
-</p>
+A feature-rich fork of [Meteor Client](https://github.com/MeteorDevelopment/meteor-client) with deep Baritone integration, advanced automation, and intelligent navigation systems.
 
-<h1 align="center">Meteor</h1>
-<p align="center">A Minecraft Fabric Utility Mod for anarchy servers.</p>
+## 🌟 Key Features
 
-<div align="center">
-    <a href="https://discord.gg/bBGQZvd"><img src="https://img.shields.io/discord/689197705683140636?logo=discord" alt="Discord"/></a>
-    <br>
-    <img src="https://img.shields.io/github/last-commit/MeteorDevelopment/meteor-client" alt="GitHub last commit"/>
-    <img src="https://img.shields.io/github/commit-activity/w/MeteorDevelopment/meteor-client" alt="GitHub commit activity"/>
-    <img src="https://img.shields.io/github/contributors/MeteorDevelopment/meteor-client" alt="GitHub contributors"/>
-    <br>
-    <img src="https://img.shields.io/github/languages/code-size/MeteorDevelopment/meteor-client" alt="GitHub code size in bytes"/>
-    <img src="https://img.shields.io/endpoint?url=https://ghloc.vercel.app/api/MeteorDevelopment/meteor-client/badge?filter=.java$&label=lines%20of%20code&color=blue" alt="GitHub lines of code"/>
-</div>
+### 🤖 Advanced Automation
+- **TreeFarm**: Automated tree farming using Baritone mining + auto-replanting
+- **AutoFarm**: Selective crop farming with configurable crop types
+- **AutoReturn**: Automatically returns to home when Baritone pauses
+- **CombatMovement**: AI-driven combat positioning using Utility AI scoring
 
-## Usage
+### 🗺️ Enhanced Navigation
+- **Route System**: Create multi-waypoint routes with ETA and cost estimates
+- **Avoidance Zones**: Define no-go areas for Baritone pathfinding
+- **Smart Goto**: Enhanced pathfinding with safety checks and recovery
+- **Stuck Detection**: Automatic detection and recovery from stuck states
 
-### Building
-- Clone this repository
-- Run `./gradlew build`
+### 📦 Storage Management
+- **StorageManager**: Passive indexing of container contents
+- **`.storage find <item>`**: Locate items across all indexed chests
+- **`.storage debug`**: View storage statistics
 
-### Installation
-Follow the [guide](https://meteorclient.com/faq/installation) on the wiki.
+### 🎮 Baritone Enhancements
+- **Baritone Settings UI**: In-game GUI for all Baritone settings
+- **Task Actions**: Quick access to common Baritone tasks (mine, explore, farm)
+- **Path Visualization**: Real-time path rendering with cost and ETA display
+- **Recovery Mode**: Safe fallback when Baritone encounters issues
 
-## Contributions
-We will review and help with all reasonable pull requests as long as the guidelines below are met.
+### 🛡️ Safety Features
+- **Threat Manager**: Track and score nearby threats
+- **Combat-Aware Pathing**: Avoid dangerous areas during navigation
+- **Safe Mode**: Conservative settings for high-risk scenarios
+- **Damage Prediction**: Estimate path danger before committing
 
-- The license header must be applied to all java source code files.
-- IDE or system-related files should be added to the `.gitignore`, never committed in pull requests.
-- In general, check existing code to make sure your code matches relatively close to the code already in the project.
-- Favour readability over compactness.
-- If you need help, check out the [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html) for a reference.
+## 🚀 Installation
 
-## Bugs and Suggestions
-Bug reports and suggestions should be made in this repo's [issue tracker](https://github.com/MeteorDevelopment/meteor-client/issues) using the templates provided.  
-Please provide as much information as you can to best help us understand your issue and give a better chance of it being resolved.
+### Prerequisites
+- Minecraft 1.21.10
+- Fabric Loader
+- Fabric API
 
-## Donations
-All of our work is completely free and non-profit (donations pay only for hosting costs), therefore we are very grateful for all donations made to support us in running our community.  
-Donations can be made via our [website](https://meteorclient.com/donate) and the minimum amount to get donor benefits is €5.  
-You will be rewarded with a role on our Discord server and a customisable in-game cape.  
-⚠️ _Make sure to create a Meteor account and link your Discord and Minecraft accounts to fully experience your rewards._ ⚠️
+### Build from Source
 
-## Credits
-[Cabaletta](https://github.com/cabaletta) and [WagYourTail](https://github.com/wagyourtail) for [Baritone](https://github.com/cabaletta/baritone)  
-The [Fabric Team](https://github.com/FabricMC) for [Fabric](https://github.com/FabricMC/fabric-loader) and [Yarn](https://github.com/FabricMC/yarn)
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/canonrebel04/meteor-client.git
+   cd meteor-client
+   ```
 
-## Licensing
-This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). 
+2. **Build**:
+   ```bash
+   ./gradlew build
+   ```
 
-If you use **ANY** code from the source:
-- You must disclose the source code of your modified work and the source code you took from this project. This means you are not allowed to use code from this project (even partially) in a closed-source and/or obfuscated application.
-- You must state clearly and obviously to all end users that you are using code from this project.
-- Your application must also be licensed under the same license.
+3. **Deploy to PrismLauncher** (optional):
+   ```bash
+   ./deploy.sh
+   ```
 
-*If you have any other questions, check our [FAQ](https://meteorclient.com/faq) or ask in our [Discord](https://meteorclient.com/discord) server.*
+   The jar will be in `build/libs/meteor-client-1.21.10-local.jar`
+
+### Dependencies
+This fork includes a bundled version of Baritone. No separate Baritone installation required.
+
+## 📖 Usage
+
+### TreeFarm Module
+```
+1. Enable TreeFarm module (Category: Movement)
+2. Configure which log types to mine (default: all)
+3. Ensure saplings are in hotbar
+4. Stand near trees - Baritone will mine and replant automatically
+```
+
+### AutoFarm Module
+```
+1. Enable AutoFarm (Category: Movement)
+2. Select preferred crops (Wheat, Carrots, Potatoes, etc.)
+3. Stand in or near farm - bot will harvest ripe crops and replant
+```
+
+### Route System
+```
+.route create <name>          - Create new route
+.route add <waypoint>          - Add waypoint to route
+.route start <name>            - Begin navigating route
+.route list                    - List all routes
+```
+
+### Storage Commands
+```
+.storage find <item>           - Find item in indexed chests
+.storage debug                 - View storage statistics
+```
+
+### Avoidance Zones
+```
+.avoidance add <name> <radius> - Create avoidance zone at current position
+.avoidance list                - List all zones
+.avoidance remove <name>       - Remove zone
+```
+
+## 🔧 Notable Changes from Upstream
+
+- **Baritone Integration**: Native Baritone support with settings GUI
+- **Custom Automation**: TreeFarm, AutoFarm, CombatMovement modules
+- **Route System**: Multi-waypoint navigation with persistence
+- **Storage Indexing**: Passive container scanning and search
+- **Enhanced HUD**: Route display, Baritone path visualization
+- **Safety Systems**: Threat detection, avoidance zones, stuck recovery
+
+## 📝 Commands Reference
+
+### Navigation
+- `.home set` - Set home location
+- `.home goto` - Path to home
+- `.goto <x> <y> <z>` - Enhanced goto with safety checks
+- `.route <create|add|start|list>` - Route management
+
+### Automation
+- `.farm start` - Start farming
+- `.mine <block>` - Mine specific block type
+
+### Storage
+- `.storage find <item>` - Locate item
+- `.storage debug` - Storage info
+
+### Avoidance
+- `.avoidance add <name> <radius>` - Add zone
+- `.avoidance list` - List zones
+
+## 🤝 Contributing
+
+This is a personal fork focused on Baritone integration and automation. For general Meteor Client contributions, please see the [upstream repository](https://github.com/MeteorDevelopment/meteor-client).
+
+## 📜 License
+
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Credits
+
+- **Meteor Client**: [MeteorDevelopment](https://github.com/MeteorDevelopment/meteor-client)
+- **Baritone**: [cabaletta](https://github.com/cabaletta/baritone)
+- Enhanced features and integration by [canonrebel04](https://github.com/canonrebel04)
+
+## 📚 Documentation
+
+For detailed information:
+- [Baritone Behavior Guide](BARITONE_BEHAVIOR_GUIDE.md)
+- [Automation Runtime](AUTOMATION_RUNTIME.md)
+- [Baritone Testing](BARITONE_TESTING.md)
+
+## ⚠️ Disclaimer
+
+This is a utility mod intended for single-player or authorized server use. Always follow server rules and respect other players.
