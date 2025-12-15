@@ -7,6 +7,7 @@ package meteordevelopment.meteorclient.systems.waypoints;
 
 import meteordevelopment.meteorclient.utils.misc.ISerializable;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -135,6 +136,63 @@ public class Route implements ISerializable<Route>, Iterable<Waypoint> {
             from++;
             to--;
         }
+    }
+
+    public double getTotalDistance() {
+        if (waypoints.size() < 2) return 0;
+        double dist = 0;
+        for (int i = 0; i < waypoints.size() - 1; i++) {
+            dist += Math.sqrt(waypoints.get(i).getPos().getSquaredDistance(waypoints.get(i + 1).getPos()));
+        }
+        if (loop && waypoints.size() > 1) {
+            dist += Math.sqrt(waypoints.get(waypoints.size() - 1).getPos().getSquaredDistance(waypoints.get(0).getPos()));
+        }
+        return dist;
+    }
+
+    public String getEstimatedTime() {
+        double dist = getTotalDistance();
+        double seconds = dist / 4.3; // Approx walking speed
+        int m = (int) (seconds / 60);
+        int s = (int) (seconds % 60);
+        if (m > 0) return String.format("%dm %ds", m, s);
+        return String.format("%ds", s);
+    }
+
+    public boolean isSafe() {
+        if (waypoints.size() < 2) return true;
+        
+        // Lazy check: Sample points along the route
+        for (int i = 0; i < waypoints.size() - 1; i++) {
+            if (!isSegmentSafe(waypoints.get(i).getPos(), waypoints.get(i + 1).getPos())) return false;
+        }
+        if (loop && waypoints.size() > 1) {
+             if (!isSegmentSafe(waypoints.get(waypoints.size() - 1).getPos(), waypoints.get(0).getPos())) return false;
+        }
+        return true;
+    }
+    
+    private boolean isSegmentSafe(BlockPos p1, BlockPos p2) {
+        net.minecraft.util.math.Vec3d start = p1.toCenterPos();
+        net.minecraft.util.math.Vec3d end = p2.toCenterPos();
+        double dist = start.distanceTo(end);
+        net.minecraft.util.math.Vec3d dir = end.subtract(start).normalize();
+        
+        // Sample every 5 blocks
+        for (double d = 0; d < dist; d += 5.0) {
+            net.minecraft.util.math.Vec3d current = start.add(dir.multiply(d));
+            
+            // Check Avoidance Zones
+            for (meteordevelopment.meteorclient.systems.modules.world.Avoidance a : meteordevelopment.meteorclient.systems.modules.world.AvoidanceManager.get().getList()) {
+                if (a.box.contains(current)) return false;
+            }
+            
+            // Check Threat Clusters
+            for (net.minecraft.util.math.Vec3d zone : meteordevelopment.meteorclient.systems.modules.combat.ThreatManager.get().getDangerZones()) {
+                if (zone.squaredDistanceTo(current) < 25) return false; // 5 block radius
+            }
+        }
+        return true;
     }
 
     @Override

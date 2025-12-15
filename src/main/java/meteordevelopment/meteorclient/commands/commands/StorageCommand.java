@@ -52,10 +52,27 @@ public class StorageCommand extends Command {
                     } else {
                         info("Item '%s' found at (%d, %d, %d).", itemId, pos.getX(), pos.getY(), pos.getZ());
                     }
-                    
                     return SINGLE_SUCCESS;
                 })
             )
         );
+        
+        builder.then(literal("duplicates").executes(ctx -> {
+            if (!Utils.canUpdate()) {
+                error("Not in a world.");
+                return SINGLE_SUCCESS;
+            }
+            
+            java.util.List<BlockPos> dups = StorageManager.get().getDuplicates();
+            if (dups.isEmpty()) {
+                info("No duplicate inventories found.");
+            } else {
+                info("Found %d containers with duplicate content:", dups.size());
+                for (BlockPos pos : dups) {
+                    info("- (%d, %d, %d)", pos.getX(), pos.getY(), pos.getZ());
+                }
+            }
+            return SINGLE_SUCCESS;
+        }));
     }
 }

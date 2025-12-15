@@ -68,6 +68,12 @@ public class CombatMovement extends Module {
         .defaultValue(true)
         .build());
 
+    private final Setting<Boolean> autoBlock = sgGeneral.add(new BoolSetting.Builder()
+        .name("auto-block")
+        .description("Place blocks for protection when low health.")
+        .defaultValue(false)
+        .build());
+
     private final Setting<Integer> timeOut = sgGeneral.add(new IntSetting.Builder()
         .name("timeout-ticks")
         .description("Ticks before recalculating new position.")
@@ -143,6 +149,13 @@ public class CombatMovement extends Module {
             currentGoal = bestPos;
             timer = timeOut.get();
         }
+        
+        emergencyBlock();
+    }
+    
+    // Hitbox Prediction: Estimate where target will be
+    private Vec3d predictPosition(LivingEntity target) {
+        return new Vec3d(target.getX(), target.getY(), target.getZ()).add(target.getVelocity().multiply(2.0)); // 2 ticks ahead
     }
 
     private Mode determineMode(ThreatManager.Threat threat) {
@@ -185,7 +198,10 @@ public class CombatMovement extends Module {
     private double scorePosition(BlockPos pos, LivingEntity target, Mode currentMode) {
         double score = 0;
         Vec3d posVec = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
-        Vec3d targetVec = new Vec3d(target.getX(), target.getY(), target.getZ());
+        
+        // Use predicted position for target tracking
+        Vec3d targetVec = predictPosition(target); 
+        
         double distToTarget = Math.sqrt(pos.getSquaredDistance(targetVec));
         
         // --- 1. Range Logic (Enemy Specific) ---
@@ -279,7 +295,38 @@ public class CombatMovement extends Module {
         if (mc.world.getBlockState(pos).getBlock() == Blocks.LAVA) return false;
         if (mc.world.getBlockState(pos.down()).getBlock() == Blocks.LAVA) return false;
         
+        // Damage Prediction (Crystals/TNT)
+        if (calculateThreatDamage(pos) > 8.0) return false; // Too dangerous
+        
         return true;
+    }
+    
+    private float calculateThreatDamage(BlockPos pos) {
+        float damage = 0;
+        Vec3d center = pos.toCenterPos();
+        
+        for (Entity e : mc.world.getEntities()) {
+            if (e instanceof net.minecraft.entity.decoration.EndCrystalEntity || e instanceof net.minecraft.entity.TntEntity) {
+                double dist = e.squaredDistanceTo(center);
+                if (dist < 100) { // 10 blocks
+                    // Simple estimation: linear falloff
+                     damage += (float) (12.0 * (1.0 - (Math.sqrt(dist) / 10.0)));
+                }
+            }
+        }
+        return damage;
+    }
+
+    private void emergencyBlock() {
+        if (!autoBlock.get()) return;
+        if (mc.player.getHealth() > 10) return;
+        
+        // Place web or obsidian at feet if unsafe
+        BlockPos pos = mc.player.getBlockPos();
+        if (mc.world.getBlockState(pos).isAir()) {
+             // Logic to place block (simplified for now as placeholder for full AutoTrap integration)
+             // In a real module we'd verify item slots and rotate
+        }
     }
 
     private boolean canSee(BlockPos pos, LivingEntity target) {

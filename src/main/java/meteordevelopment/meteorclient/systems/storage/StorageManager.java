@@ -148,5 +148,46 @@ public class StorageManager extends System<StorageManager> {
         return this;
     }
     
+    public List<BlockPos> getDuplicates() {
+        List<BlockPos> duplicates = new ArrayList<>();
+        Map<String, BlockPos> seenInventories = new HashMap<>(); // Inventories by hash/string rep
+        
+        for (Map.Entry<BlockPos, List<ItemData>> entry : containers.entrySet()) {
+            // Create a signature of the inventory
+            if (entry.getValue().isEmpty()) continue;
+            
+            StringBuilder sb = new StringBuilder();
+            // Sort to ensure order independence? No, chest order matters for exact duplicate
+            for (ItemData data : entry.getValue()) {
+                sb.append(data.id).append(":").append(data.count).append(";");
+            }
+            String signature = sb.toString();
+            
+            if (seenInventories.containsKey(signature)) {
+                duplicates.add(entry.getKey());
+            } else {
+                seenInventories.put(signature, entry.getKey());
+            }
+        }
+        return duplicates;
+    }
+
+    public List<BlockPos> findAll(Item item) {
+        List<BlockPos> found = new ArrayList<>();
+        if (item == null) return found;
+
+        String targetId = Registries.ITEM.getId(item).toString();
+        
+        for (Map.Entry<BlockPos, List<ItemData>> entry : containers.entrySet()) {
+            for (ItemData data : entry.getValue()) {
+                if (data.id.equals(targetId)) {
+                    found.add(entry.getKey());
+                    break; // Found in this container, Move to next container
+                }
+            }
+        }
+        return found;
+    }
+    
     public record ItemData(String id, int count) {}
 }

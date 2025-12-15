@@ -70,6 +70,7 @@ public class Commands {
         add(new HomeCommand());
         add(new AvoidanceCommand());
         add(new StorageCommand());
+        add(new RouteCommand());
 
         COMMANDS.sort(Comparator.comparing(Command::getName));
 

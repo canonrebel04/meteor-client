@@ -69,8 +69,12 @@ public class TreeFarm extends Module {
 
     @Override
     public void onDeactivate() {
+        if (pausedForPickup) {
+            ChatUtils.sendPlayerMsg("#resume");
+        }
         stopBaritone();
         baritoneActive = false;
+        pausedForPickup = false;
     }
 
     private void initSaplingMap() {
@@ -106,6 +110,8 @@ public class TreeFarm extends Module {
         }
     }
 
+    private boolean pausedForPickup = false;
+
     @EventHandler
     public void onTick(TickEvent.Post event) {
         if (!baritoneActive) return;
@@ -113,6 +119,11 @@ public class TreeFarm extends Module {
         // Check if we're near a tree base that was just mined
         if (lastMinedTreeBase == null) {
             lastMinedTreeBase = findNearbyTreeBase();
+            if (lastMinedTreeBase != null) {
+                // Found a new tree base, pause Baritone to collect drops
+                ChatUtils.sendPlayerMsg("#pause");
+                pausedForPickup = true;
+            }
         }
 
         // If we have a tree base and there are log items nearby
@@ -128,9 +139,14 @@ public class TreeFarm extends Module {
                 return; // Wait
             }
 
-            // Pickup period finished, replant
+            // Pickup period finished, replant and resume
             if (replant.get()) {
                 replantAt(lastMinedTreeBase);
+            }
+            
+            if (pausedForPickup) {
+                ChatUtils.sendPlayerMsg("#resume");
+                pausedForPickup = false;
             }
             
             lastMinedTreeBase = null;

@@ -498,6 +498,9 @@ public class Modules extends System<Modules> {
         add(new SafeWalk());
         add(new Scaffold());
         add(new AutoFarm());
+        add(new AutoSorter());
+        add(new AutoTrader());
+        add(new MobFarm());
         add(new TreeFarm());
         add(new Slippy());
         add(new Sneak());

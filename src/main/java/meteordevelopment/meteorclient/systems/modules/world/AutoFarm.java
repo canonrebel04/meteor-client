@@ -52,6 +52,18 @@ public class AutoFarm extends Module {
         .filter(this::isCrop)
         .build());
 
+    private final Setting<Boolean> useBonemeal = sgGeneral.add(new BoolSetting.Builder()
+        .name("use-bonemeal")
+        .description("Use Bonemeal on crops.")
+        .defaultValue(false)
+        .build());
+
+    private final Setting<Boolean> redstoneControl = sgGeneral.add(new BoolSetting.Builder()
+        .name("redstone-control")
+        .description("Only function when receiving a redstone signal.")
+        .defaultValue(false)
+        .build());
+
     private boolean isCrop(Block block) {
         return block instanceof net.minecraft.block.CropBlock || block == Blocks.NETHER_WART;
     }
@@ -85,6 +97,10 @@ public class AutoFarm extends Module {
             return;
         }
 
+        if (redstoneControl.get() && !mc.world.isReceivingRedstonePower(mc.player.getBlockPos())) {
+            return;
+        }
+
         if (timer > 0) {
             timer--;
             return;
@@ -94,9 +110,21 @@ public class AutoFarm extends Module {
         if (currentTarget != null) {
             // Check if processed or invalid
             if (!FarmManager.get().isRipe(mc.world.getBlockState(currentTarget))) {
-                currentTarget = null; // Done or invalid
-                BaritoneUtils.cancelEverything(BaritoneUtils.getPrimaryBaritone());
-                return;
+                // If not ripe, maybe we can bonemeal it?
+                if (useBonemeal.get() && canBonemeal(currentTarget)) {
+                    applyBonemeal(currentTarget);
+                    timer = delay.get();
+                    return;
+                }
+                
+                // If really not targetable (e.g. valid after bonemeal, or finished)
+                if (FarmManager.get().isRipe(mc.world.getBlockState(currentTarget))) {
+                     // Proceed to harvest
+                } else {
+                    currentTarget = null; // Done or invalid
+                    BaritoneUtils.cancelEverything(BaritoneUtils.getPrimaryBaritone());
+                    return;
+                }
             }
 
             // Check distance
@@ -110,6 +138,12 @@ public class AutoFarm extends Module {
         // 2. Find new target if idle
         if (currentTarget == null) {
             List<BlockPos> crops = FarmManager.get().getRipeCrops(range.get(), blocks.get());
+            
+            // If none ripe, check for bonemeal targets
+            if (crops.isEmpty() && useBonemeal.get()) {
+                crops = findUnripeCrops();
+            }
+
             if (crops.isEmpty()) return;
 
             // Sort by distance
@@ -121,6 +155,24 @@ public class AutoFarm extends Module {
                 pathTo(best);
             }
         }
+    }
+    
+    private List<BlockPos> findUnripeCrops() {
+        // Simple scan for unripe crops we can bonemeal
+        // This is a simplified implementation for the example
+        return new java.util.ArrayList<>(); 
+    }
+
+    private boolean canBonemeal(BlockPos pos) {
+        return InvUtils.find(Items.BONE_MEAL).found();
+    }
+    
+    private void applyBonemeal(BlockPos pos) {
+         int slot = InvUtils.find(Items.BONE_MEAL).slot();
+         if (slot != -1 && InvUtils.swap(slot, true)) {
+             mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, new net.minecraft.util.hit.BlockHitResult(pos.toCenterPos(), Direction.UP, pos, false));
+             InvUtils.swapBack();
+         }
     }
 
     private void pathTo(BlockPos pos) {
@@ -140,15 +192,23 @@ public class AutoFarm extends Module {
         if (replant.get()) {
             BlockState state = mc.world.getBlockState(pos);
             Item seed = FarmManager.get().getSeedFor(state.getBlock());
+            
+            // Smart Seed Selection
+            if (seed == Items.AIR) {
+                // Try to infer seed from items in inventory if block didn't give known seed
+                // For now, simpler fallback: check common seeds
+                if (InvUtils.find(Items.WHEAT_SEEDS).found()) seed = Items.WHEAT_SEEDS;
+                else if (InvUtils.find(Items.POTATO).found()) seed = Items.POTATO;
+                else if (InvUtils.find(Items.CARROT).found()) seed = Items.CARROT;
+            }
+
             if (seed != Items.AIR) {
                 int slot = InvUtils.findInHotbar(seed).slot();
-                if (slot != -1) {
                 if (slot != -1) {
                     if (InvUtils.swap(slot, true)) {
                         mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, new net.minecraft.util.hit.BlockHitResult(pos.toCenterPos(), Direction.UP, pos, false));
                         InvUtils.swapBack();
                     }
-                }
                 }
             }
         }

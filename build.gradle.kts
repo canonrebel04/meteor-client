@@ -5,6 +5,12 @@ plugins {
     id("maven-publish")
 }
 
+val prismMinecraftDir = providers.gradleProperty("prismMinecraftDir")
+    .orElse(providers.environmentVariable("PRISM_MINECRAFT_DIR"))
+    .orElse("${System.getProperty("user.home")}/.local/share/PrismLauncher/instances/1.21.10/minecraft")
+
+val prismModsDir = prismMinecraftDir.map { File(it, "mods") }
+
 base {
     archivesName = properties["archives_base_name"] as String
     group = properties["maven_group"] as String
@@ -48,10 +54,6 @@ repositories {
             includeGroup("maven.modrinth")
         }
     }
-    
-    flatDir {
-        dirs("/home/cachy/.local/share/PrismLauncher/instances/1.21.10/minecraft/mods")
-    }
 }
 
 val modInclude: Configuration by configurations.creating
@@ -93,7 +95,17 @@ dependencies {
     modCompileOnly(libs.viafabricplus) { isTransitive = false }
     modCompileOnly(libs.viafabricplus.api) { isTransitive = false }
 
-    modCompileOnly(files("/home/cachy/.local/share/PrismLauncher/instances/1.21.10/minecraft/mods/baritone-standalone-fabric-1.21.10-SNAPSHOT.jar")) // (libs.baritone)
+    // Baritone API (compile-only)
+    // Default: use published dependency from Meteor maven.
+    // Optional override: pass -PbaritoneJar=/path/to/baritone.jar (e.g. your built standalone jar).
+    val baritoneJarOverride = providers.gradleProperty("baritoneJar").orNull?.let(::File)
+    val baritoneJarInPrism = prismModsDir.get().let { File(it, "baritone-standalone-fabric-${libs.versions.minecraft.get()}-SNAPSHOT.jar") }
+
+    when {
+        baritoneJarOverride != null && baritoneJarOverride.isFile -> modCompileOnly(files(baritoneJarOverride))
+        baritoneJarInPrism.isFile -> modCompileOnly(files(baritoneJarInPrism))
+        else -> modCompileOnly(libs.baritone)
+    }
     modCompileOnly(libs.modmenu)
 
     // Libraries (JAR-in-JAR)
@@ -208,10 +220,9 @@ tasks {
         useJUnitPlatform()
     }
 
-    val prismMinecraftDir = providers.gradleProperty("prismMinecraftDir")
-        .orElse(providers.environmentVariable("PRISM_MINECRAFT_DIR"))
-        .orElse("${System.getProperty("user.home")}/.local/share/PrismLauncher/instances/1.21.10/minecraft")
-
+    val prismMinecraftDir = project.findProperty("prismMinecraftDir")?.toString()
+        ?: System.getenv("PRISM_MINECRAFT_DIR")
+        ?: "${System.getProperty("user.home")}/.local/share/PrismLauncher/instances/1.21.10/minecraft"
     register<Copy>("deployToPrism") {
         group = "deployment"
         description = "Builds the remapped jar and copies it into PrismLauncher instance mods/ (overwrites)."
@@ -220,17 +231,18 @@ tasks {
         dependsOn(remapJarTask)
 
         val archivesBaseNameValue = project.base.archivesName.get()
-        val modsDirProvider = prismMinecraftDir.map { File(it, "mods") }
+        val modsDir = File(prismMinecraftDir, "mods")
 
         from(remapJarTask)
-        into(modsDirProvider)
+        into(modsDir)
 
         doFirst {
-            val modsDir = modsDirProvider.get()
-            require(modsDir.isDirectory) {
-                "PrismLauncher mods dir not found: ${modsDir.absolutePath}. " +
+            if (!modsDir.exists()) {
+                throw GradleException(
+                    "PrismLauncher mods dir not found: ${modsDir.absolutePath}. " +
                     "Set -PprismMinecraftDir=/path/to/PrismLauncher/instances/<instance>/minecraft " +
                     "or env PRISM_MINECRAFT_DIR."
+                )
             }
 
             val targetName = remapJarTask.get().outputs.files.singleFile.name
@@ -243,6 +255,8 @@ tasks {
                 }
                 ?.filter { it.name != targetName }
                 ?.forEach { it.delete() }
+            
+            println("Deploying to: ${modsDir.absolutePath}")
         }
     }
 

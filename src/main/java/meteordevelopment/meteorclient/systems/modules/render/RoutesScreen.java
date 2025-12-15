@@ -25,7 +25,9 @@ public class RoutesScreen extends WindowScreen {
         WTable table = add(theme.table()).expandX().widget();
 
         for (Route route : Waypoints.get().routes) {
-            table.add(theme.label(route.name)).expandX();
+            String safety = route.isSafe() ? "" : (net.minecraft.util.Formatting.RED + " ⚠️ UNSAFE");
+            table.add(theme.label(route.name + safety)).expandX();
+            table.add(theme.label(String.format("Dist: %.1fm (%s)", route.getTotalDistance(), route.getEstimatedTime())));
 
             WButton edit = table.add(theme.button(GuiRenderer.EDIT)).widget();
             edit.action = () -> mc.setScreen(new RouteEditorScreen(theme, route, this::reload));
